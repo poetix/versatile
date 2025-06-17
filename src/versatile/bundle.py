@@ -6,6 +6,9 @@ by resolving dependencies between registered providers in a given `ComponentProv
 
 Each provider may declare dependencies on other components by name or by type.
 The resolution process performs a topological sort and instantiates each provider in order.
+
+Bundles may be layered via a parent-child relationship, enabling scoped resolution:
+a child bundle may depend on components in its parent, but not vice versa.
 """
 
 from collections import defaultdict, deque
@@ -19,7 +22,7 @@ from versatile.registry import (
     Dependency,
 )
 
-__all__ = ["Bundle", "MaterialisedComponent", "ComponentKey"]
+__all__ = ["make_bundle", "Bundle", "MaterialisedComponent", "ComponentKey"]
 
 
 @dataclass(frozen=True)
@@ -41,22 +44,55 @@ class MaterialisedComponent:
 
 
 ComponentKey = Union[type, str]
+"""
+Represents a key used to look up a component in a bundle. This may be either a type
+(e.g., `MyService`) or a string (e.g., 'logger'), depending on how the provider was registered.
+"""
 
 
 class Bundle:
+    """
+    A container of materialised components, resolved from a set of providers.
+
+    Bundles may be layered: a child bundle may inherit and resolve dependencies from
+    its parent, allowing scoped resolution across session or request boundaries.
+
+    Components are registered by both name and type (where uniquely provided),
+    and can be retrieved using either.
+    """
+
     def __init__(self, parent: Optional["Bundle"] = None):
         self._materialised_components: dict[ComponentKey, MaterialisedComponent] = {}
         self._parent = parent
 
     def add_component(self, key: ComponentKey, value: MaterialisedComponent):
+        """
+        Add a component to the bundle under the given key.
+
+        Args:
+            key: The name or type of the component.
+            value: The materialised component object.
+        """
         self._materialised_components[key] = value
 
     def find_component(self, key: ComponentKey) -> MaterialisedComponent:
+        """
+        Find a component in this bundle or any parent bundle.
+
+        Args:
+            key: The name or type to look up.
+
+        Returns:
+            The matching `MaterialisedComponent`.
+
+        Raises:
+            KeyError: If no component with the given key is found.
+        """
         try:
             return self._materialised_components[key]
         except KeyError:
             if self._parent:
-                return self._parent[key]
+                return self._parent.find_component(key)
             raise KeyError(key)
 
     def __getitem__(self, key: ComponentKey) -> Any:
@@ -97,13 +133,37 @@ def make_bundle(
 
 
 class _DependencyGraph:
+    """
+    Internal helper to represent and traverse a directed acyclic graph of provider dependencies.
+
+    Each node corresponds to a provider, and each edge indicates a required dependency.
+    The graph supports topological traversal, raising an error if cycles remain.
+    """
+
     def __init__(self):
         self._dependencies: dict[str, set[str]] = defaultdict(set)
 
     def add_dependencies(self, dependee: str, dependencies: Iterable[str]):
+        """
+        Add one or more dependencies to the graph for a given dependee node.
+
+        Args:
+            dependee: The provider name whose dependencies are being registered.
+            dependencies: A list of provider names this dependee depends on.
+        """
         self._dependencies[dependee].update(dependencies)
 
     def traverse(self):
+        """
+        Perform a topological traversal of the dependency graph.
+
+        Yields:
+            Provider names in an order where all dependencies of each node
+            are yielded before the node itself.
+
+        Raises:
+            DependencyError: If any cycles or unsatisfied dependencies remain.
+        """
         ready_to_materialise = deque(
             dependee
             for dependee, dependencies in self._dependencies.items()
@@ -122,6 +182,13 @@ class _DependencyGraph:
             )
 
     def remove_dependency(self, next_item, ready_to_materialise):
+        """
+        Remove a resolved dependency from the graph and update readiness of dependents.
+
+        Args:
+            next_item: The provider name that has just been resolved.
+            ready_to_materialise: A queue of provider names ready for resolution.
+        """
         del self._dependencies[next_item]
 
         for dependee, dependencies in self._dependencies.items():
@@ -133,10 +200,11 @@ class _DependencyGraph:
 
 class _BundleBuilder:
     """
-    Internal helper class that builds a dependency graph and resolves providers
-    into a materialised component bundle.
+    Internal utility that coordinates the resolution of component providers
+    into a materialised `Bundle`. Not part of the public API.
 
-    This class is not part of the public API.
+    Operates by building a dependency graph from registered providers, resolving each
+    in topological order, and injecting resolved dependencies into each provider function.
     """
 
     def __init__(self, providers, parent: Bundle):
@@ -194,6 +262,13 @@ class _BundleBuilder:
         return bundle
 
     def _materialise_and_add_to_bundle(self, bundle, ready_provider_name):
+        """
+        Materialise a single provider and add its result to the bundle under name and type.
+
+        Args:
+            bundle: The bundle under construction.
+            ready_provider_name: The name of the provider to instantiate.
+        """
         provider = self._providers_by_name[ready_provider_name]
         materialised_component = self._materialise_component(provider, bundle)
 
@@ -203,6 +278,12 @@ class _BundleBuilder:
             bundle.add_component(provider.provided_type, materialised_component)
 
     def _provides_unique_type(self, provider: ComponentProvider) -> bool:
+        """
+        Check whether a provider uniquely provides its return type.
+
+        Returns:
+            True if this provider is the only one for its type (not overridden by parent).
+        """
         return provider.provided_type in self._unique_provider_names_by_type
 
     def _build_dependency_graph(self) -> _DependencyGraph:
@@ -218,11 +299,16 @@ class _BundleBuilder:
         dependency_graph: _DependencyGraph = _DependencyGraph()
 
         for provider_name, provider in self._providers_by_name.items():
+            matched_providers = (
+                self._find_matching_provider_name(dependency, provider.name)
+                for dependency in provider.dependencies
+            )
             dependency_graph.add_dependencies(
                 provider_name,
                 (
-                    self._find_matching_provider_name(dependency, provider.name)
-                    for dependency in provider.dependencies
+                    dependency_name
+                    for dependency_name in matched_providers
+                    if not dependency_name in self._parent
                 ),
             )
 

@@ -123,3 +123,37 @@ def test_name_conflict_between_profiles_raises():
 
     with pytest.raises(DependencyError, match="Duplicate provider name"):
         make_bundle(registry, {"a", "b"})
+
+
+def test_child_bundle_resolves_from_parent():
+    global_registry = ComponentProviderRegistry()
+    kid_a_registry = ComponentProviderRegistry()
+    kid_b_registry = ComponentProviderRegistry()
+    arithmetic_registry = ComponentProviderRegistry()
+
+    @global_registry.provides("lhs")
+    def global_lhs() -> int:
+        return 42
+
+    @kid_a_registry.provides("rhs")
+    def kid_a() -> int:
+        return 23
+
+    @kid_b_registry.provides("rhs")
+    def kid_b() -> int:
+        return 19
+
+    @arithmetic_registry.provides("result")
+    def adder(a: Annotated[int, "lhs"], b: Annotated[int, "rhs"]) -> int:
+        return a + b
+
+    global_bundle = make_bundle(global_registry)
+
+    kid_a_bundle = make_bundle(kid_a_registry, parent=global_bundle)
+    kid_b_bundle = make_bundle(kid_b_registry, parent=global_bundle)
+
+    adder_a_bundle = make_bundle(arithmetic_registry, parent=kid_a_bundle)
+    adder_b_bundle = make_bundle(arithmetic_registry, parent=kid_b_bundle)
+
+    assert adder_a_bundle["result"] == 65
+    assert adder_b_bundle["result"] == 61
