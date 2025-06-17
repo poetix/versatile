@@ -88,20 +88,21 @@ class Bundle:
         Raises:
             KeyError: If no component with the given key is found.
         """
-        try:
-            return self._materialised_components[key]
-        except KeyError:
-            if self._parent:
+        if self._parent and key in self._parent:
+            if key not in self._materialised_components:
                 return self._parent.find_component(key)
-            raise KeyError(key)
+            else:
+                raise KeyError(key)
+
+        return self._materialised_components[key]
 
     def __getitem__(self, key: ComponentKey) -> Any:
         return self.find_component(key).component
 
-    def __contains__(self, item) -> bool:
-        return item in self._materialised_components or (
-            self._parent and item in self._parent
-        )
+    def __contains__(self, item: ComponentKey) -> bool:
+        if self._parent and item in self._parent:
+            return item not in self._materialised_components
+        return item in self._materialised_components
 
 
 def make_bundle(
@@ -234,7 +235,7 @@ class _BundleBuilder:
         unique_provider_names_by_type: dict[type, str] = {
             provider_type: providers_of_type[0]
             for provider_type, providers_of_type in provider_names_by_type.items()
-            if len(providers_of_type) == 1 and not providers_of_type[0] in self._parent
+            if len(providers_of_type) == 1
         }
 
         self._providers_by_name = providers_by_name
@@ -345,17 +346,22 @@ class _BundleBuilder:
                 f"{dependency.name} of provider {provider_name}"
             )
 
+        if dependency.type in self._parent:
+            if dependency.type not in self._unique_provider_names_by_type:
+                return self._parent[dependency.type].name
+            else:
+                raise DependencyError(
+                    f"Ambiguous providers for type {dependency.type} "
+                    f"in this bundle and its parent"
+                )
+
         try:
             return self._unique_provider_names_by_type[dependency.type]
         except KeyError:
-            try:
-                return self._parent[dependency.type].name
-            except KeyError:
-                pass
-        raise DependencyError(
-            f"No unique provider for type {dependency.type} found for dependency "
-            f"{dependency.name} of provider {provider_name}"
-        )
+            raise DependencyError(
+                f"No unique provider for type {dependency.type} found for dependency "
+                f"{dependency.name} of provider {provider_name}"
+            )
 
     def _materialise_component(
         self, provider: ComponentProvider, containing_bundle: Bundle

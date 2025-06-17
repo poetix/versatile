@@ -157,3 +157,59 @@ def test_child_bundle_resolves_from_parent():
 
     assert adder_a_bundle["result"] == 65
     assert adder_b_bundle["result"] == 61
+
+
+def test_raises_if_child_component_aliases_parent():
+    parent_registry = ComponentProviderRegistry()
+    child_registry = ComponentProviderRegistry()
+
+    @parent_registry.provides("it")
+    def parent() -> int:
+        return 23
+
+    @child_registry.provides("it")
+    def child() -> int:
+        return 23
+
+    parent_bundle = make_bundle(parent_registry)
+    with pytest.raises(DependencyError, match="Duplicate provider name it"):
+        child_bundle = make_bundle(child_registry, parent=parent_bundle)
+
+
+def test_type_resolution():
+    parent_registry = ComponentProviderRegistry()
+    child_registry = ComponentProviderRegistry()
+
+    @parent_registry.provides("this")
+    def parent() -> int:
+        return 23
+
+    @child_registry.provides("that")
+    def child() -> int:
+        return 23
+
+    parent_bundle = make_bundle(parent_registry)
+    child_bundle = make_bundle(child_registry, parent=parent_bundle)
+    assert int in parent_bundle
+    assert int not in child_bundle
+
+
+def test_ambiguous_dependency_from_parent_and_child_fails_resolution():
+    parent = ComponentProviderRegistry()
+    child = ComponentProviderRegistry()
+
+    @parent.provides("a")
+    def a() -> int:
+        return 1
+
+    @child.provides("b")
+    def b() -> int:
+        return 2
+
+    @child.provides()
+    def dependent(x: int) -> str:
+        return str(x)
+
+    parent_bundle = make_bundle(parent)
+    with pytest.raises(DependencyError, match="Ambiguous providers for type"):
+        make_bundle(child, parent=parent_bundle)
