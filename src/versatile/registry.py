@@ -1,6 +1,14 @@
 import inspect
 from dataclasses import dataclass
-from typing import Callable, get_type_hints, get_origin, Annotated, get_args, Optional
+from typing import (
+    Callable,
+    get_type_hints,
+    get_origin,
+    Annotated,
+    get_args,
+    Optional,
+    Any,
+)
 
 __all__ = [
     "DependencyError",
@@ -42,6 +50,7 @@ class ComponentProvider:
         profiles: Profiles under which the component is active.
         provided_type: Return type of the component function, if available.
         dependencies: List of dependencies inferred from the function signature.
+        metadata: Metadata about the component.
     """
 
     name: str
@@ -49,6 +58,7 @@ class ComponentProvider:
     profiles: list[str]
     provided_type: Optional[type]
     dependencies: list[Dependency]
+    metadata: dict[str, Any]
 
 
 class ComponentProviderRegistry:
@@ -110,6 +120,7 @@ class ComponentProviderRegistry:
                 profiles,
                 get_type_hints(func).get("return", None),
                 _get_dependencies(func),
+                {},
             )
             self.register(component)
             return func

@@ -8,9 +8,9 @@ Each provider may declare dependencies on other components by name or by type.
 The resolution process performs a topological sort and instantiates each provider in order.
 """
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing import Optional, Any, Iterable, Union
 
 from versatile.registry import (
     DependencyError,
@@ -18,6 +18,8 @@ from versatile.registry import (
     ComponentProviderRegistry,
     Dependency,
 )
+
+__all__ = ["Bundle", "MaterialisedComponent", "ComponentKey"]
 
 
 @dataclass(frozen=True)
@@ -38,7 +40,7 @@ class MaterialisedComponent:
     metadata: dict[str, Any]
 
 
-ComponentKey = type | str
+ComponentKey = Union[type, str]
 
 
 class Bundle:
@@ -92,6 +94,41 @@ def make_bundle(
     providers = registry.registered_providers(profiles)
 
     return _BundleBuilder(providers, parent or Bundle()).build_bundle()
+
+
+class _DependencyGraph:
+    def __init__(self):
+        self._dependencies: dict[str, set[str]] = defaultdict(set)
+
+    def add_dependencies(self, dependee: str, dependencies: Iterable[str]):
+        self._dependencies[dependee].update(dependencies)
+
+    def traverse(self):
+        ready_to_materialise = deque(
+            dependee
+            for dependee, dependencies in self._dependencies.items()
+            if len(dependencies) == 0
+        )
+
+        while len(ready_to_materialise) > 0:
+            next_item = ready_to_materialise.popleft()
+            yield next_item
+
+            self.remove_dependency(next_item, ready_to_materialise)
+
+        if len(self._dependencies) > 0:
+            raise DependencyError(
+                f"Unresolvable dependencies: {self._dependencies.keys()}"
+            )
+
+    def remove_dependency(self, next_item, ready_to_materialise):
+        del self._dependencies[next_item]
+
+        for dependee, dependencies in self._dependencies.items():
+            if len(dependencies) > 0:
+                dependencies.discard(next_item)
+                if len(dependencies) == 0:
+                    ready_to_materialise.append(dependee)
 
 
 class _BundleBuilder:
@@ -149,55 +186,44 @@ class _BundleBuilder:
             DependencyError: If the dependency graph contains cycles or unsatisfiable dependencies.
         """
         dependency_graph = self._build_dependency_graph()
-        result = Bundle(self._parent)
-        ready_to_materialise = [
-            provider_name
-            for provider_name, deps in dependency_graph.items()
-            if len(deps) == 0
-        ]
+        bundle = Bundle(self._parent)
 
-        while len(ready_to_materialise) > 0:
-            ready_provider_name = ready_to_materialise.pop()
-            del dependency_graph[ready_provider_name]
+        for ready_provider_name in dependency_graph.traverse():
+            self._materialise_and_add_to_bundle(bundle, ready_provider_name)
 
-            materialised_component = self._materialise_component(
-                ready_provider_name, result
-            )
-            result.add_component(ready_provider_name, materialised_component)
+        return bundle
 
-            provider = self._providers_by_name[ready_provider_name]
-            if provider.provided_type in self._unique_provider_names_by_type:
-                result.add_component(provider.provided_type, materialised_component)
+    def _materialise_and_add_to_bundle(self, bundle, ready_provider_name):
+        provider = self._providers_by_name[ready_provider_name]
+        materialised_component = self._materialise_component(provider, bundle)
 
-            for provider_name, deps in dependency_graph.items():
-                if len(deps) > 0:
-                    deps.discard(ready_provider_name)
-                    if len(deps) == 0:
-                        ready_to_materialise.append(provider_name)
+        bundle.add_component(ready_provider_name, materialised_component)
 
-        if len(dependency_graph) > 0:
-            raise DependencyError(
-                f"Unresolvable dependencies: {dependency_graph.keys()}"
-            )
+        if self._provides_unique_type(provider):
+            bundle.add_component(provider.provided_type, materialised_component)
 
-        return result
+    def _provides_unique_type(self, provider: ComponentProvider) -> bool:
+        return provider.provided_type in self._unique_provider_names_by_type
 
-    def _build_dependency_graph(self) -> dict[str, set[str]]:
+    def _build_dependency_graph(self) -> _DependencyGraph:
         """
         Construct a dependency graph where each provider maps to the set of provider names it depends on.
 
         Returns:
-            A dict mapping provider names to the names of their direct dependencies.
+            A dependency graph mapping provider names to the names of their direct dependencies.
 
         Raises:
             DependencyError: If a dependency cannot be matched to a provider by name or type.
         """
-        dependency_graph: dict[str, set[str]] = defaultdict(set)
+        dependency_graph: _DependencyGraph = _DependencyGraph()
 
         for provider_name, provider in self._providers_by_name.items():
-            dependency_graph[provider.name].update(
-                self._find_matching_provider_name(dependency, provider.name)
-                for dependency in provider.dependencies
+            dependency_graph.add_dependencies(
+                provider_name,
+                (
+                    self._find_matching_provider_name(dependency, provider.name)
+                    for dependency in provider.dependencies
+                ),
             )
 
         return dependency_graph
@@ -246,7 +272,7 @@ class _BundleBuilder:
         )
 
     def _materialise_component(
-        self, provider_name: str, containing_bundle: Bundle
+        self, provider: ComponentProvider, containing_bundle: Bundle
     ) -> MaterialisedComponent:
         """
         Instantiate a component by invoking its provider function with resolved dependencies.
@@ -261,9 +287,8 @@ class _BundleBuilder:
         Raises:
             DependencyError: If any dependency cannot be resolved.
         """
-        provider = self._providers_by_name[provider_name]
         dependency_names = [
-            self._find_matching_provider_name(dependency, provider_name)
+            self._find_matching_provider_name(dependency, provider.name)
             for dependency in provider.dependencies
         ]
         component_obj = provider.func(
@@ -274,8 +299,5 @@ class _BundleBuilder:
         )
 
         return MaterialisedComponent(
-            provider_name,
-            component_obj,
-            dependency_names,
-            provider.metadata if hasattr(provider, "metadata") else {},
+            provider.name, component_obj, dependency_names, provider.metadata
         )
