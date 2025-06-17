@@ -12,7 +12,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, Any
 
-from versatile.registry import DependencyError, ComponentProvider, ComponentProviderRegistry, Dependency
+from versatile.registry import (
+    DependencyError,
+    ComponentProvider,
+    ComponentProviderRegistry,
+    Dependency,
+)
 
 
 @dataclass(frozen=True)
@@ -26,6 +31,7 @@ class MaterialisedComponent:
         dependencies: A list of provider names or keys this component depends on.
         metadata: Optional metadata declared on the provider.
     """
+
     name: str
     component: Any
     dependencies: list[str]
@@ -34,8 +40,9 @@ class MaterialisedComponent:
 
 ComponentKey = type | str
 
+
 class Bundle:
-    def __init__(self, parent: Optional['Bundle']=None):
+    def __init__(self, parent: Optional["Bundle"] = None):
         self._materialised_components: dict[ComponentKey, MaterialisedComponent] = {}
         self._parent = parent
 
@@ -50,7 +57,7 @@ class Bundle:
                 return self._parent[key]
             raise KeyError(key)
 
-    def __getitem__(self, key: type|str) -> Any:
+    def __getitem__(self, key: type | str) -> Any:
         return self.find_component(key).component
 
     def __contains__(self, item) -> bool:
@@ -59,9 +66,11 @@ class Bundle:
         )
 
 
-def make_bundle(registry: ComponentProviderRegistry,
-                profiles: Optional[set[str]]=None,
-                parent: Optional[Bundle]=None) -> Bundle:
+def make_bundle(
+    registry: ComponentProviderRegistry,
+    profiles: Optional[set[str]] = None,
+    parent: Optional[Bundle] = None,
+) -> Bundle:
     """
     Construct and return a fully materialised bundle of components.
 
@@ -92,6 +101,7 @@ class _BundleBuilder:
 
     This class is not part of the public API.
     """
+
     def __init__(self, providers, parent: Bundle):
         self._parent = parent
         self._build_indices(providers)
@@ -140,20 +150,24 @@ class _BundleBuilder:
         """
         dependency_graph = self._build_dependency_graph()
         result = Bundle(self._parent)
-        ready_to_materialise = [provider_name for provider_name, deps in dependency_graph.items()
-                                if len(deps) == 0]
+        ready_to_materialise = [
+            provider_name
+            for provider_name, deps in dependency_graph.items()
+            if len(deps) == 0
+        ]
 
         while len(ready_to_materialise) > 0:
             ready_provider_name = ready_to_materialise.pop()
             del dependency_graph[ready_provider_name]
 
             materialised_component = self._materialise_component(
-                ready_provider_name, result)
+                ready_provider_name, result
+            )
             result.add_component(ready_provider_name, materialised_component)
 
             provider = self._providers_by_name[ready_provider_name]
             if provider.provided_type in self._unique_provider_names_by_type:
-                result.add_component(provider.provided_type,  materialised_component)
+                result.add_component(provider.provided_type, materialised_component)
 
             for provider_name, deps in dependency_graph.items():
                 if len(deps) > 0:
@@ -162,7 +176,9 @@ class _BundleBuilder:
                         ready_to_materialise.append(provider_name)
 
         if len(dependency_graph) > 0:
-            raise DependencyError(f"Unresolvable dependencies: {dependency_graph.keys()}")
+            raise DependencyError(
+                f"Unresolvable dependencies: {dependency_graph.keys()}"
+            )
 
         return result
 
@@ -186,7 +202,9 @@ class _BundleBuilder:
 
         return dependency_graph
 
-    def _find_matching_provider_name(self, dependency: Dependency, provider_name: str) -> str:
+    def _find_matching_provider_name(
+        self, dependency: Dependency, provider_name: str
+    ) -> str:
         """
         Resolve the name of the provider that satisfies a given dependency.
 
@@ -204,12 +222,16 @@ class _BundleBuilder:
             DependencyError: If no matching provider can be found.
         """
         if dependency.qualifier:
-            if dependency.qualifier in self._providers_by_name or dependency.qualifier in self._parent:
+            if (
+                dependency.qualifier in self._providers_by_name
+                or dependency.qualifier in self._parent
+            ):
                 return dependency.qualifier
 
             raise DependencyError(
                 f"No provider with qualifier {dependency.qualifier} found for dependency "
-                f"{dependency.name} of provider {provider_name}")
+                f"{dependency.name} of provider {provider_name}"
+            )
 
         try:
             return self._unique_provider_names_by_type[dependency.type]
@@ -223,7 +245,9 @@ class _BundleBuilder:
             f"{dependency.name} of provider {provider_name}"
         )
 
-    def _materialise_component(self, provider_name: str, containing_bundle: Bundle) -> MaterialisedComponent:
+    def _materialise_component(
+        self, provider_name: str, containing_bundle: Bundle
+    ) -> MaterialisedComponent:
         """
         Instantiate a component by invoking its provider function with resolved dependencies.
 
@@ -238,17 +262,20 @@ class _BundleBuilder:
             DependencyError: If any dependency cannot be resolved.
         """
         provider = self._providers_by_name[provider_name]
-        dependency_names = [self._find_matching_provider_name(dependency, provider_name)
-                            for dependency in provider.dependencies]
-        component_obj = provider.func(*(
-            containing_bundle[dependency_name]
-            for dependency_name in dependency_names))
+        dependency_names = [
+            self._find_matching_provider_name(dependency, provider_name)
+            for dependency in provider.dependencies
+        ]
+        component_obj = provider.func(
+            *(
+                containing_bundle[dependency_name]
+                for dependency_name in dependency_names
+            )
+        )
 
         return MaterialisedComponent(
             provider_name,
             component_obj,
             dependency_names,
-            provider.metadata if hasattr(provider, 'metadata') else {}
+            provider.metadata if hasattr(provider, "metadata") else {},
         )
-
-
