@@ -59,7 +59,7 @@ class Bundle:
                 return self._parent[key]
             raise KeyError(key)
 
-    def __getitem__(self, key: type | str) -> Any:
+    def __getitem__(self, key: ComponentKey) -> Any:
         return self.find_component(key).component
 
     def __contains__(self, item) -> bool:
