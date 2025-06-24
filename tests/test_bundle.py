@@ -181,3 +181,18 @@ def test_raises_if_child_component_aliases_parent():
         match=r"Provider names .* conflict with component in parent bundle",
     ):
         make_bundle(child_registry, parent=parent_bundle)
+
+
+def test_keyword_only_dependency():
+    registry = ComponentProviderRegistry()
+
+    @registry.provides("foo")
+    def make_foo() -> str:
+        return "foo"
+
+    @registry.provides("bar")
+    def make_bar(*, foo: Annotated[str, "foo"]) -> str:
+        return f"bar-{foo}"
+
+    bundle = make_bundle(registry)
+    assert bundle["bar"] == "bar-foo"

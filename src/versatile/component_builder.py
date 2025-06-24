@@ -16,7 +16,11 @@ class ComponentBuilder:
     def build(
         self, provider: ComponentProvider, dependencies: dict[str, Any]
     ) -> MaterialisedComponent:
-        component_obj = provider.func(*dependencies.values())
+        call_kwargs = {
+            dep.parameter_name: dependencies[dep.component_name]
+            for dep in provider.dependencies
+        }
+        component_obj = provider.func(**call_kwargs)
 
         untransformed = MaterialisedComponent(
             uuid.uuid4(),
