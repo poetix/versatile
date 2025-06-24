@@ -95,11 +95,13 @@ class _DependencyGraph:
 
 class BundleManifestBuilder:
     """Resolve providers into a :class:`BundleManifest`."""
+
     def __init__(self, parent: Optional[ComponentSet]):
         self._parent = parent
 
     def build(self, provider_set: ProviderSet) -> BundleManifest:
         self._validate_compatibility_with_parent(provider_set)
+        required_from_scope = self._get_required_from_scope(provider_set)
 
         resolved_dependencies = {
             provider_name: [
@@ -110,11 +112,19 @@ class BundleManifestBuilder:
         build_order = [
             (dep, resolved_dependencies[dep])
             for dep in self._build_dependency_graph(
-                resolved_dependencies, set(provider_set.providers_by_name.keys())
+                resolved_dependencies, required_from_scope
             ).traverse()
         ]
 
-        required_from_scope = (
+        return BundleManifest(
+            self._parent,
+            required_from_scope,
+            provider_set.providers_by_name,
+            build_order,
+        )
+
+    def _get_required_from_scope(self, provider_set):
+        return (
             {
                 component_name
                 for component_name in provider_set.required_components
@@ -124,15 +134,8 @@ class BundleManifestBuilder:
             else provider_set.required_components
         )
 
-        return BundleManifest(
-            self._parent,
-            required_from_scope,
-            provider_set.providers_by_name,
-            build_order,
-        )
-
     def _build_dependency_graph(
-        self, dependencies: dict[str, list[str]], provider_names: set[str]
+        self, dependencies: dict[str, list[str]], provided_from_scope
     ) -> _DependencyGraph:
         """
         Construct a dependency graph where each provider maps to the set of provider names it depends on.
@@ -153,7 +156,7 @@ class BundleManifestBuilder:
                     for dependency_name in dependency_names
                     if not (
                         (self._parent and dependency_name in self._parent)
-                        or dependency_name not in provider_names
+                        or dependency_name in provided_from_scope
                     )
                 ),
             )

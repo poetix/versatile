@@ -1,4 +1,3 @@
-
 """High level entry points for constructing bundles."""
 
 from typing import Optional, Any

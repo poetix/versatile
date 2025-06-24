@@ -7,6 +7,7 @@ from versatile.domain import MaterialisedComponent
 
 class ComponentSet:
     """Collection of components with hierarchical lookup."""
+
     def __init__(
         self,
         components: dict[str, MaterialisedComponent],

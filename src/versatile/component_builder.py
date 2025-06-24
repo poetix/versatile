@@ -10,6 +10,7 @@ from versatile.registry import ComponentProvider
 
 class ComponentBuilder:
     """Build :class:`MaterialisedComponent` instances from providers."""
+
     def __init__(
         self,
         transformers: list[Callable[[MaterialisedComponent], MaterialisedComponent]],

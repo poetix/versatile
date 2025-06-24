@@ -1,2 +1,1 @@
 """Versatile dependency injection framework."""
-

@@ -48,6 +48,7 @@ class Bundle:
 
 class BundleBuilder:
     """Instantiate components from a :class:`BundleManifest`."""
+
     def __init__(self, manifest: BundleManifest, component_builder: ComponentBuilder):
         self._manifest = manifest
         self._component_builder = component_builder
@@ -65,16 +66,7 @@ class BundleBuilder:
             DependencyError: If required scope items are missing.
         """
         required_from_scope = self._manifest.required_from_scope
-        missing_from_scope = required_from_scope - scope.keys()
-        if missing_from_scope:
-            raise DependencyError(
-                f"Missing items {missing_from_scope} from provided scope"
-            )
-        extraneous = scope.keys() - required_from_scope
-        if extraneous:
-            raise DependencyError(
-                f"Unexpected items {extraneous} in provided scope"
-            )
+        _validate_scoped_values(required_from_scope, scope.keys())
 
         built: dict[str, Any] = {}
         parent = self._manifest.parent
@@ -96,3 +88,13 @@ class BundleBuilder:
             )
 
         return Bundle(ComponentSet(built, parent))
+
+
+def _validate_scoped_values(required_from_scope, scope_keys):
+    missing_from_scope = required_from_scope - scope_keys
+    if missing_from_scope:
+        raise DependencyError(f"Missing items {missing_from_scope} from provided scope")
+
+    extraneous = scope_keys - required_from_scope
+    if extraneous:
+        raise DependencyError(f"Unexpected items {extraneous} in provided scope")
