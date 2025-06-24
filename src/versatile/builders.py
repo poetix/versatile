@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any
 
 from versatile.bundle import Bundle, BundleBuilder
 from versatile.bundle_manifest import BundleManifestBuilder, BundleManifest
@@ -22,6 +22,10 @@ def make_manifest(
         registry: The component provider registry containing declared providers.
         profiles: An optional set of profile names used to filter active providers.
         parent: An optional parent bundle containing already-materialised components.
+        scope: Optional mapping supplying objects for dependencies that are
+            required from the external scope.
+        scope: Optional mapping supplying objects for dependencies that are
+            required from the external scope.
 
     Returns:
         A dictionary mapping provider names (and uniquely provided types) to
@@ -40,6 +44,7 @@ def make_bundle(
     registry: ComponentProviderRegistry,
     profiles: Optional[set[str]] = None,
     parent: Optional[Bundle] = None,
+    scope: Optional[dict[str, Any]] = None,
 ) -> Bundle:
     """
     Construct and return a fully materialised bundle of components.
@@ -51,8 +56,10 @@ def make_bundle(
         registry: The component provider registry containing declared providers.
         profiles: An optional set of profile names used to filter active providers.
         parent: An optional parent bundle containing already-materialised components.
+        scope: Optional mapping supplying objects for dependencies that are
+            required from the external scope.
 
-    Returns:
+        Returns:
         A dictionary mapping provider names (and uniquely provided types) to
         materialised component instances.
 
@@ -62,4 +69,4 @@ def make_bundle(
     manifest = make_manifest(registry, profiles, parent)
     bundle_builder = BundleBuilder(manifest, ComponentBuilder([]))
 
-    return bundle_builder.build({})
+    return bundle_builder.build(scope or {})

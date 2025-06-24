@@ -97,7 +97,9 @@ class BundleManifestBuilder:
         }
         build_order = [
             (dep, resolved_dependencies[dep])
-            for dep in self._build_dependency_graph(resolved_dependencies).traverse()
+            for dep in self._build_dependency_graph(
+                resolved_dependencies, set(provider_set.providers_by_name.keys())
+            ).traverse()
         ]
 
         required_from_scope = (
@@ -118,7 +120,7 @@ class BundleManifestBuilder:
         )
 
     def _build_dependency_graph(
-        self, dependencies: dict[str, list[str]]
+        self, dependencies: dict[str, list[str]], provider_names: set[str]
     ) -> _DependencyGraph:
         """
         Construct a dependency graph where each provider maps to the set of provider names it depends on.
@@ -137,7 +139,10 @@ class BundleManifestBuilder:
                 (
                     dependency_name
                     for dependency_name in dependency_names
-                    if not (self._parent and dependency_name in self._parent)
+                    if not (
+                        (self._parent and dependency_name in self._parent)
+                        or dependency_name not in provider_names
+                    )
                 ),
             )
 

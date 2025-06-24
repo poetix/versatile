@@ -109,7 +109,7 @@ def test_missing_dependency_raises():
 
     with pytest.raises(
         DependencyError,
-        match="Unresolvable dependencies.*",
+        match="Missing items.*",
     ):
         make_bundle(registry)
 
@@ -196,3 +196,37 @@ def test_keyword_only_dependency():
 
     bundle = make_bundle(registry)
     assert bundle["bar"] == "bar-foo"
+
+
+def test_scope_supplies_required_dependencies():
+    registry = ComponentProviderRegistry()
+
+    @registry.provides("result")
+    def make_result(lhs: Annotated[int, "lhs"], rhs: Annotated[int, "rhs"]) -> int:
+        return lhs + rhs
+
+    bundle = make_bundle(registry, scope={"lhs": 2, "rhs": 3})
+
+    assert bundle["result"] == 5
+
+
+def test_scope_missing_dependency_raises():
+    registry = ComponentProviderRegistry()
+
+    @registry.provides("result")
+    def make_result(lhs: Annotated[int, "lhs"]) -> int:
+        return lhs
+
+    with pytest.raises(DependencyError, match="Missing items {'lhs'}"):
+        make_bundle(registry, scope={})
+
+
+def test_scope_extraneous_dependency_raises():
+    registry = ComponentProviderRegistry()
+
+    @registry.provides("result")
+    def make_result(lhs: Annotated[int, "lhs"]) -> int:
+        return lhs
+
+    with pytest.raises(DependencyError, match="Unexpected items {'foo'}"):
+        make_bundle(registry, scope={"lhs": 1, "foo": 2})
