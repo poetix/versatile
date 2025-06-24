@@ -32,8 +32,11 @@ class Bundle:
     Bundles may be layered: a child bundle may inherit and resolve dependencies from
     its parent, allowing scoped resolution across session or request boundaries.
 
-    Components are registered by both name and type (where uniquely provided),
-    and can be retrieved using either.
+    Components are registered by name. If a provider is decorated with
+    :meth:`~versatile.registry.ComponentProviderRegistry.provides_type`, the
+    string representation of its annotated return type becomes that name.
+    ``__getitem__`` converts a type key to a string for lookup, enabling
+    retrieval using the same type supplied at registration.
     """
 
     def __init__(self, components: ComponentSet):
@@ -44,11 +47,23 @@ class Bundle:
 
 
 class BundleBuilder:
+    """Instantiate components from a :class:`BundleManifest`."""
     def __init__(self, manifest: BundleManifest, component_builder: ComponentBuilder):
         self._manifest = manifest
         self._component_builder = component_builder
 
     def build(self, scope: dict[str, Any]) -> Bundle:
+        """Materialise all components defined by the manifest.
+
+        Args:
+            scope: Mapping of dependency names to objects supplied by the caller.
+
+        Returns:
+            A :class:`Bundle` containing the instantiated components.
+
+        Raises:
+            DependencyError: If required scope items are missing.
+        """
         required_from_scope = self._manifest.required_from_scope
         missing_from_scope = required_from_scope - scope.keys()
         if missing_from_scope:

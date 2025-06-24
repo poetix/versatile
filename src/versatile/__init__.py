@@ -1,0 +1,2 @@
+"""Versatile dependency injection framework."""
+
