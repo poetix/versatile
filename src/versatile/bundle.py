@@ -70,6 +70,11 @@ class BundleBuilder:
             raise DependencyError(
                 f"Missing items {missing_from_scope} from provided scope"
             )
+        extraneous = scope.keys() - required_from_scope
+        if extraneous:
+            raise DependencyError(
+                f"Unexpected items {extraneous} in provided scope"
+            )
 
         built: dict[str, Any] = {}
         parent = self._manifest.parent
