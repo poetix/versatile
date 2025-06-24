@@ -10,33 +10,14 @@ from typing import (
     Any,
 )
 
+from versatile.domain import Dependency
+from versatile.errors import DependencyError
+
 __all__ = [
-    "DependencyError",
     "Dependency",
     "ComponentProvider",
     "ComponentProviderRegistry",
 ]
-
-
-class DependencyError(Exception):
-    """Raised when a component's dependency cannot be resolved or is misannotated."""
-
-    pass
-
-
-@dataclass(frozen=True)
-class Dependency:
-    """Represents a dependency required by a component.
-
-    Attributes:
-        name: The parameter name in the function signature.
-        type: The expected type of the dependency.
-        qualifier: An optional string used to disambiguate dependencies of the same type.
-    """
-
-    name: str
-    type: type
-    qualifier: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -65,15 +46,15 @@ class ComponentProviderRegistry:
     """Registry for components, supporting registration and profile-based filtering."""
 
     def __init__(self):
-        self._components = []
+        self._providers = []
 
-    def register(self, component: ComponentProvider):
+    def register(self, provider: ComponentProvider):
         """Register a component explicitly.
 
         Args:
-            component: The Component instance to be registered.
+            provider: The Component instance to be registered.
         """
-        self._components.append(component)
+        self._providers.append(provider)
 
     def registered_providers(
         self, profiles: set[str] = None
@@ -87,11 +68,11 @@ class ComponentProviderRegistry:
             A list of components whose profiles match the given profile set.
         """
         if profiles is None:
-            return self._components
-        return [c for c in self._components if _profiles_match(c.profiles, profiles)]
+            return self._providers
+        return [c for c in self._providers if _profiles_match(c.profiles, profiles)]
 
     def provides(
-        self, name: str = None, profiles: Optional[list[str]] = None
+        self, name: Optional[str] = None, profiles: Optional[list[str]] = None
     ) -> Callable:
         """Decorator to register a function as a component provider.
 
@@ -108,13 +89,23 @@ class ComponentProviderRegistry:
             def make_thing() -> Thing:
                 return Thing()
         """
-        if profiles is None:
-            profiles = []
+        return self._make_decorator(
+            name, profiles or [], lambda func: _infer_name_from(func.__name__)
+        )
 
+    def provides_type(self, profiles: list[str] = None) -> Callable:
+        return self._make_decorator(None, profiles or [], _get_name_from_return_type)
+
+    def _make_decorator(
+        self,
+        name: Optional[str],
+        profiles: list[str],
+        name_from_func: Callable[[Callable], str],
+    ) -> Callable:
         def decorator(func: Callable) -> Callable:
-            inferred_name = name or _infer_name_from(func.__name__)
+            inferred_name = name if name else name_from_func(func)
 
-            component = ComponentProvider(
+            provider = ComponentProvider(
                 inferred_name,
                 func,
                 profiles,
@@ -122,7 +113,8 @@ class ComponentProviderRegistry:
                 _get_dependencies(func),
                 {},
             )
-            self.register(component)
+            self.register(provider)
+
             return func
 
         return decorator
@@ -150,12 +142,10 @@ def _get_dependencies(func: Callable) -> list[Dependency]:
     result = []
 
     for name, param in sig.parameters.items():
-        try:
-            annotation = hints[name]
-        except KeyError:
+        annotation = hints.get(name)
+        if not annotation:
             raise DependencyError(
-                "Dependency <%s> of provider <%s> is not annotated"
-                % (name, func.__name__)
+                f"Dependency '{name}' of provider '{func.__name__}' is not annotated"
             )
 
         if get_origin(annotation) is Annotated:
@@ -163,6 +153,18 @@ def _get_dependencies(func: Callable) -> list[Dependency]:
         else:
             base_type, metadata = annotation, []
 
-        result.append(Dependency(name, base_type, next((m for m in metadata), None)))
+        component_name = next((m for m in metadata), str(base_type))
+
+        result.append(Dependency(name, base_type, component_name))
 
     return result
+
+
+def _get_name_from_return_type(func: Callable) -> str:
+    return_type = get_type_hints(func).get("return", None)
+    if return_type is not None:
+        return str(return_type)
+    raise DependencyError(
+        f"Function {func.__name__} is decorated with @provides_type "
+        "but does not have an annotated return type"
+    )

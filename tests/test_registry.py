@@ -55,7 +55,7 @@ def test_provider_is_registered(greeter: ComponentProvider):
     assert greeter.provided_type == Callable[[str], str]
 
 
-def test_name_resolution_from_declaring_function_name(
+def test_name_can_be_resolved_from_declaring_function_name(
     uppercase_greeter: ComponentProvider,
 ):
     assert uppercase_greeter.name == "uppercase_greeter"
@@ -71,11 +71,24 @@ def test_provider_can_have_no_return_type(
     assert component_finder("foo").provided_type is None
 
 
-def test_dependencies(uppercase_greeter):
+def test_dependencies_can_be_identified_by_annotated_name(registry):
+    @registry.provides(name="foo")
+    def foo(name: Annotated[str, "bar"]) -> str:
+        pass
 
-    assert uppercase_greeter.dependencies == [
-        Dependency("greeter", Callable[[str], str], "greeter")
-    ]
+    print(registry.registered_providers())
+    assert registry.registered_providers()[0].dependencies[0].component_name == "bar"
+
+
+def test_dependencies_can_be_identified_by_type_name(registry):
+    @registry.provides(name="foo")
+    def foo(name: str) -> str:
+        pass
+
+    assert (
+        registry.registered_providers()[0].dependencies[0].component_name
+        == "<class 'str'>"
+    )
 
 
 def test_retrieve_components_by_profile(registry):

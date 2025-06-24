@@ -2,8 +2,9 @@ from typing import Callable, Any, Annotated
 
 import pytest
 
-from versatile.bundle import make_bundle
-from versatile.registry import ComponentProviderRegistry, DependencyError
+from versatile.builders import make_bundle
+from versatile.errors import DependencyError
+from versatile.registry import ComponentProviderRegistry
 
 DB = Callable[[str], dict[str, Any]]
 Service = Callable[[str], None]
@@ -27,25 +28,25 @@ class TestPrinter(Printer):
 def registry() -> ComponentProviderRegistry:
     registry = ComponentProviderRegistry()
 
-    @registry.provides(name="db", profiles=["test"])
+    @registry.provides_type(profiles=["test"])
     def make_test_db() -> DB:
         def db(_user_id: str) -> dict[str, Any]:
             return {"name": "Arthur Putey", "age": 42}
 
         return db
 
-    @registry.provides(name="db", profiles=["uat"])
+    @registry.provides_type(profiles=["uat"])
     def make_uat_db() -> DB:
         def db(_user_id: str) -> dict:
             return {"name": "Gawain of Camelot", "age": 23}
 
         return db
 
-    @registry.provides(name="printer", profiles=["test"])
+    @registry.provides_type(profiles=["test"])
     def make_test_printer() -> Printer:
         return TestPrinter()
 
-    @registry.provides()
+    @registry.provides_type()
     def make_service(db: DB, printer: Printer) -> Service:
         def service_func(user_id: str) -> None:
             user_details = db(user_id)
@@ -102,11 +103,14 @@ def test_dependency_cycle_detected():
 def test_missing_dependency_raises():
     registry = ComponentProviderRegistry()
 
-    @registry.provides()
+    @registry.provides_type()
     def make_service(printer: Printer) -> Service:
         return lambda _: None
 
-    with pytest.raises(DependencyError, match="No unique provider for type.*Printer"):
+    with pytest.raises(
+        DependencyError,
+        match="Unresolvable dependencies.*",
+    ):
         make_bundle(registry)
 
 
@@ -121,7 +125,7 @@ def test_name_conflict_between_profiles_raises():
     def x_b() -> int:
         return 2
 
-    with pytest.raises(DependencyError, match="Duplicate provider name"):
+    with pytest.raises(DependencyError, match="Duplicate provider name 'x'"):
         make_bundle(registry, {"a", "b"})
 
 
@@ -172,44 +176,8 @@ def test_raises_if_child_component_aliases_parent():
         return 23
 
     parent_bundle = make_bundle(parent_registry)
-    with pytest.raises(DependencyError, match="Duplicate provider name it"):
-        child_bundle = make_bundle(child_registry, parent=parent_bundle)
-
-
-def test_type_resolution():
-    parent_registry = ComponentProviderRegistry()
-    child_registry = ComponentProviderRegistry()
-
-    @parent_registry.provides("this")
-    def parent() -> int:
-        return 23
-
-    @child_registry.provides("that")
-    def child() -> int:
-        return 23
-
-    parent_bundle = make_bundle(parent_registry)
-    child_bundle = make_bundle(child_registry, parent=parent_bundle)
-    assert int in parent_bundle
-    assert int not in child_bundle
-
-
-def test_ambiguous_dependency_from_parent_and_child_fails_resolution():
-    parent = ComponentProviderRegistry()
-    child = ComponentProviderRegistry()
-
-    @parent.provides("a")
-    def a() -> int:
-        return 1
-
-    @child.provides("b")
-    def b() -> int:
-        return 2
-
-    @child.provides()
-    def dependent(x: int) -> str:
-        return str(x)
-
-    parent_bundle = make_bundle(parent)
-    with pytest.raises(DependencyError, match="Ambiguous providers for type"):
-        make_bundle(child, parent=parent_bundle)
+    with pytest.raises(
+        DependencyError,
+        match=r"Provider names .* conflict with component in parent bundle",
+    ):
+        make_bundle(child_registry, parent=parent_bundle)
