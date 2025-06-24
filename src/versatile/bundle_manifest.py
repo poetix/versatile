@@ -1,3 +1,5 @@
+"""Utilities for constructing bundle build manifests."""
+
 from collections import deque, defaultdict
 from dataclasses import dataclass
 from typing import Optional, FrozenSet, Iterable
@@ -10,10 +12,19 @@ from versatile.registry import ComponentProvider
 
 @dataclass(frozen=True)
 class BundleManifest:
+    """Description of how to build a :class:`~versatile.bundle.Bundle`."""
+
     parent: Optional[ComponentSet]
+    """Components available from the parent bundle, if any."""
+
     required_from_scope: FrozenSet[str]
+    """Names of dependencies that must be supplied by the caller."""
+
     providers: dict[str, ComponentProvider]
+    """Provider functions keyed by the component name they produce."""
+
     build_order: list[tuple[str, list[str]]]
+    """Ordered list describing which providers to invoke and their dependencies."""
 
 
 class _DependencyGraph:
@@ -83,6 +94,7 @@ class _DependencyGraph:
 
 
 class BundleManifestBuilder:
+    """Resolve providers into a :class:`BundleManifest`."""
     def __init__(self, parent: Optional[ComponentSet]):
         self._parent = parent
 

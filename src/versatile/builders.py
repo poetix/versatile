@@ -1,5 +1,7 @@
-from typing import Optional, Any
 
+"""High level entry points for constructing bundles."""
+
+from typing import Optional, Any
 from versatile.bundle import Bundle, BundleBuilder
 from versatile.bundle_manifest import BundleManifestBuilder, BundleManifest
 from versatile.component_builder import ComponentBuilder
@@ -12,11 +14,11 @@ def make_manifest(
     profiles: Optional[set[str]] = None,
     parent: Optional[Bundle] = None,
 ) -> BundleManifest:
-    """
-    Construct and return a fully materialised bundle of components.
+    """Create a :class:`BundleManifest` for the given registry.
 
-    The function selects providers from the given registry, resolves their dependencies,
-    and materialises them in dependency order.
+    The registry is filtered by the optional profile set and combined with the
+    parent bundle's components (if provided) to determine the order in which
+    providers should be invoked.
 
     Args:
         registry: The component provider registry containing declared providers.
@@ -28,8 +30,7 @@ def make_manifest(
             required from the external scope.
 
     Returns:
-        A dictionary mapping provider names (and uniquely provided types) to
-        materialised component instances.
+        The resolved :class:`BundleManifest` describing provider build order.
 
     Raises:
         DependencyError: If dependencies are ambiguous, missing, or cyclic.
@@ -46,11 +47,10 @@ def make_bundle(
     parent: Optional[Bundle] = None,
     scope: Optional[dict[str, Any]] = None,
 ) -> Bundle:
-    """
-    Construct and return a fully materialised bundle of components.
+    """Construct and return a fully materialised :class:`Bundle`.
 
-    The function selects providers from the given registry, resolves their dependencies,
-    and materialises them in dependency order.
+    Providers are selected from the registry, resolved into a manifest and then
+    instantiated in dependency order.
 
     Args:
         registry: The component provider registry containing declared providers.
@@ -59,9 +59,8 @@ def make_bundle(
         scope: Optional mapping supplying objects for dependencies that are
             required from the external scope.
 
-        Returns:
-        A dictionary mapping provider names (and uniquely provided types) to
-        materialised component instances.
+    Returns:
+        The instantiated :class:`Bundle`.
 
     Raises:
         DependencyError: If dependencies are ambiguous, missing, or cyclic.

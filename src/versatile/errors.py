@@ -1,3 +1,5 @@
+"""Custom exceptions raised by the library."""
+
 __all__ = ["DependencyError"]
 
 

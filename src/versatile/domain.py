@@ -1,3 +1,5 @@
+"""Domain models used throughout the framework."""
+
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID

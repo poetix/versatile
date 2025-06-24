@@ -1,3 +1,5 @@
+"""Registration and introspection utilities for component providers."""
+
 import inspect
 from dataclasses import dataclass
 from typing import (
@@ -94,6 +96,20 @@ class ComponentProviderRegistry:
         )
 
     def provides_type(self, profiles: list[str] = None) -> Callable:
+        """Decorator to register a provider by its annotated return type.
+
+        The returned decorator behaves like :meth:`provides` but derives the
+        component name from the provider's return type annotation.
+
+        Args:
+            profiles: Optional list of profiles for which the component is active.
+
+        Returns:
+            A decorator registering the function under the name of its return type.
+
+        Raises:
+            DependencyError: If the function lacks an annotated return type.
+        """
         return self._make_decorator(None, profiles or [], _get_name_from_return_type)
 
     def _make_decorator(

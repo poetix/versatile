@@ -1,9 +1,12 @@
+"""Container for resolved components with optional parent lookup."""
+
 from typing import Optional
 
 from versatile.domain import MaterialisedComponent
 
 
 class ComponentSet:
+    """Collection of components with hierarchical lookup."""
     def __init__(
         self,
         components: dict[str, MaterialisedComponent],
