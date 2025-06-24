@@ -1,3 +1,5 @@
+"""Helpers for managing sets of providers."""
+
 from dataclasses import dataclass
 from typing import FrozenSet
 

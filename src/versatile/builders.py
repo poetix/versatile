@@ -1,3 +1,5 @@
+"""High level entry points for constructing bundles."""
+
 from typing import Optional
 
 from versatile.bundle import Bundle, BundleBuilder
@@ -12,11 +14,11 @@ def make_manifest(
     profiles: Optional[set[str]] = None,
     parent: Optional[Bundle] = None,
 ) -> BundleManifest:
-    """
-    Construct and return a fully materialised bundle of components.
+    """Create a :class:`BundleManifest` for the given registry.
 
-    The function selects providers from the given registry, resolves their dependencies,
-    and materialises them in dependency order.
+    The registry is filtered by the optional profile set and combined with the
+    parent bundle's components (if provided) to determine the order in which
+    providers should be invoked.
 
     Args:
         registry: The component provider registry containing declared providers.
@@ -24,8 +26,7 @@ def make_manifest(
         parent: An optional parent bundle containing already-materialised components.
 
     Returns:
-        A dictionary mapping provider names (and uniquely provided types) to
-        materialised component instances.
+        The resolved :class:`BundleManifest` describing provider build order.
 
     Raises:
         DependencyError: If dependencies are ambiguous, missing, or cyclic.
@@ -41,11 +42,10 @@ def make_bundle(
     profiles: Optional[set[str]] = None,
     parent: Optional[Bundle] = None,
 ) -> Bundle:
-    """
-    Construct and return a fully materialised bundle of components.
+    """Construct and return a fully materialised :class:`Bundle`.
 
-    The function selects providers from the given registry, resolves their dependencies,
-    and materialises them in dependency order.
+    Providers are selected from the registry, resolved into a manifest and then
+    instantiated in dependency order.
 
     Args:
         registry: The component provider registry containing declared providers.
@@ -53,8 +53,7 @@ def make_bundle(
         parent: An optional parent bundle containing already-materialised components.
 
     Returns:
-        A dictionary mapping provider names (and uniquely provided types) to
-        materialised component instances.
+        The instantiated :class:`Bundle`.
 
     Raises:
         DependencyError: If dependencies are ambiguous, missing, or cyclic.
