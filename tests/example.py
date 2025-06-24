@@ -1,6 +1,7 @@
 from typing import Callable, Annotated
+
+from versatile.builders import make_bundle
 from versatile.registry import ComponentProviderRegistry
-from versatile.bundle import make_bundle
 
 # Define a registry and register providers
 registry = ComponentProviderRegistry()
