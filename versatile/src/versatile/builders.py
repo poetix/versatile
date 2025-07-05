@@ -7,6 +7,7 @@ from versatile.component_builder import ComponentBuilder
 from versatile.provider_set import make_provider_set
 from versatile.registry import ComponentProviderRegistry
 
+__all__ = ['make_manifest', 'make_bundle']
 
 def make_manifest(
     registry: ComponentProviderRegistry,

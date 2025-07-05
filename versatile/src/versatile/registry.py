@@ -127,7 +127,7 @@ class ComponentProviderRegistry:
                 profiles,
                 get_type_hints(func).get("return", None),
                 _get_dependencies(func),
-                {},
+                func.__provider_metadata__ if hasattr(func, '__provider_metadata__') else {},
             )
             self.register(provider)
 
