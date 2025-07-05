@@ -118,7 +118,21 @@ class ComponentProviderRegistry:
         profiles: list[str],
         name_from_func: Callable[[Callable], str],
     ) -> Callable:
-        def decorator(func: Callable) -> Callable:
+        def decorator(obj: Any) -> Any:
+            if inspect.isclass(obj):
+                return self._make_class_decorator(obj, name, profiles)
+            if inspect.isfunction(obj):
+                return self._make_function_decorator(obj, name, profiles, name_from_func)
+            raise DependencyError(f"{obj} is not a class or function")
+
+        return decorator
+
+    def _make_class_decorator(self, cls: type, name: str, profiles: list[str]) -> type:
+        pass
+
+    def _make_function_decorator(
+        self, func: Callable, name: str, profiles: list[str], name_from_func: Callable[[Callable], str]
+    ) -> Callable:
             inferred_name = name if name else name_from_func(func)
 
             provider = ComponentProvider(
@@ -132,8 +146,6 @@ class ComponentProviderRegistry:
             self.register(provider)
 
             return func
-
-        return decorator
 
 
 def _profiles_match(stated: list[str], selected: set[str]) -> bool:
