@@ -33,7 +33,7 @@ jobs:
         for dir in */pyproject.toml; do
           project_dir=$(dirname "$dir")
           echo "Linting $project_dir"
-
+  
           # Lint
           flake8 "$project_dir" \
             --count --select=E9,F63,F7,F82 --show-source --statistics || exit 1
@@ -47,7 +47,6 @@ jobs:
           
           echo "Building pling-repository"
           pip install -e pling-repository
-        done
     - name: Test modules
       run: |
         for dir in */pyproject.toml; do
