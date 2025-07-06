@@ -15,7 +15,7 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
 
-dependencies = ["versatile @ file://../versatile"]
+dependencies = ["versatile @ ../versatile"]
 
 [project.optional-dependencies]
 dev = [
