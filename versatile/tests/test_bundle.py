@@ -7,15 +7,13 @@ from versatile.errors import DependencyError
 from versatile.registry import ComponentProviderRegistry
 
 DB = Callable[[str], dict[str, Any]]
-Service = Callable[[str], None]
-
 
 class Printer:
     def print(self, line):
         pass
 
 
-class TestPrinter(Printer):
+class MockPrinter(Printer):
     def __init__(self):
         self.printed = []
 
@@ -23,6 +21,14 @@ class TestPrinter(Printer):
         for k, v in user_details.items():
             self.printed.append(f"{k}: {v}")
 
+
+class Service:
+    db: DB
+    printer: Printer
+
+    def print_user_details(self, user_id):
+        user_details = self.db(user_id)
+        self.printer.print(user_details)
 
 @pytest.fixture
 def registry() -> ComponentProviderRegistry:
@@ -42,17 +48,8 @@ def registry() -> ComponentProviderRegistry:
 
         return db
 
-    @registry.provides_type(profiles=["test"])
-    def make_test_printer() -> Printer:
-        return TestPrinter()
-
-    @registry.provides_type()
-    def make_service(db: DB, printer: Printer) -> Service:
-        def service_func(user_id: str) -> None:
-            user_details = db(user_id)
-            printer.print(user_details)
-
-        return service_func
+    registry.provides_supertype(profiles=["test"])(MockPrinter)
+    registry.provides_type()(Service)
 
     return registry
 
@@ -61,7 +58,7 @@ def test_build_resolving_by_declared_type(registry):
     bundle = make_bundle(registry, {"test"})
     service = bundle[Service]
     printer = bundle[Printer]
-    service("id123")
+    service.print_user_details("id123")
 
     assert printer.printed == ["name: Arthur Putey", "age: 42"]
 

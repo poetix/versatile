@@ -1,6 +1,7 @@
 """Registration and introspection utilities for component providers."""
 
 import inspect
+from abc import abstractmethod
 from dataclasses import dataclass
 from typing import (
     Callable,
@@ -9,7 +10,7 @@ from typing import (
     Annotated,
     get_args,
     Optional,
-    Any,
+    Any, Literal, Union,
 )
 
 from versatile.domain import Dependency
@@ -43,6 +44,29 @@ class ComponentProvider:
     dependencies: list[Dependency]
     metadata: dict[str, Any]
 
+
+NamingStrategy = Callable[[Any], str]
+def constant_name(name: str) -> NamingStrategy:
+    def strategy(target: Any) -> str:
+        return name
+
+    return strategy
+
+def inferred_name(target: Any) -> str:
+    if target.__name__.startswith("make_"):
+        return target.__name__[5:]
+    else:
+        return target.__name__
+
+def name_from_type(target: Any) -> str:
+    if inspect.isfunction(target):
+        return _get_name_from_return_type(target)
+    return str(target)
+
+def name_from_supertype(target: Any) -> str:
+    if not inspect.isclass(target):
+        raise ValueError(f"{target} is not a class")
+    return str(target.__bases__[0])
 
 class ComponentProviderRegistry:
     """Registry for components, supporting registration and profile-based filtering."""
@@ -91,8 +115,9 @@ class ComponentProviderRegistry:
             def make_thing() -> Thing:
                 return Thing()
         """
+        naming_strategy = constant_name(name) if name else inferred_name
         return self._make_decorator(
-            name, profiles or [], lambda func: _infer_name_from(func.__name__)
+            naming_strategy, profiles or []
         )
 
     def provides_type(self, profiles: list[str] = None) -> Callable:
@@ -110,43 +135,59 @@ class ComponentProviderRegistry:
         Raises:
             DependencyError: If the function lacks an annotated return type.
         """
-        return self._make_decorator(None, profiles or [], _get_name_from_return_type)
+        return self._make_decorator(name_from_type, profiles or [])
+
+    def provides_supertype(self, profiles: list[str] = None) -> Callable:
+        """Decorator to register a provider by its annotated return type.
+
+        The returned decorator behaves like :meth:`provides` but derives the
+        component name from the provider's return type annotation.
+
+        Args:
+            profiles: Optional list of profiles for which the component is active.
+
+        Returns:
+            A decorator registering the function under the name of its return type.
+
+        Raises:
+            DependencyError: If the function lacks an annotated return type.
+        """
+        return self._make_decorator(name_from_supertype, profiles or [])
 
     def _make_decorator(
         self,
-        name: Optional[str],
-        profiles: list[str],
-        name_from_func: Callable[[Callable], str],
+        naming_strategy: NamingStrategy,
+        profiles: list[str]
     ) -> Callable:
         def decorator(obj: Any) -> Any:
             if inspect.isclass(obj):
-                return self._make_class_decorator(obj, name, profiles)
-            if inspect.isfunction(obj):
-                return self._make_function_decorator(obj, name, profiles, name_from_func)
-            raise DependencyError(f"{obj} is not a class or function")
+                provider = _make_class_provider(obj, naming_strategy, profiles)
+            elif inspect.isfunction(obj):
+                provider = _make_function_provider(obj, naming_strategy, profiles)
+            else:
+                raise DependencyError(f"{obj} is not a class or function")
+
+            self.register(provider)
+            return obj
 
         return decorator
 
-    def _make_class_decorator(self, cls: type, name: str, profiles: list[str]) -> type:
-        pass
 
-    def _make_function_decorator(
-        self, func: Callable, name: str, profiles: list[str], name_from_func: Callable[[Callable], str]
-    ) -> Callable:
-            inferred_name = name if name else name_from_func(func)
+def _make_class_provider(cls: Any, naming_strategy: NamingStrategy, profiles: list[str]) -> ComponentProvider:
+    name = naming_strategy(cls)
+    return _make_function_provider(dataclass()(cls), constant_name(name), profiles)
 
-            provider = ComponentProvider(
-                inferred_name,
-                func,
-                profiles,
-                get_type_hints(func).get("return", None),
-                _get_dependencies(func),
-                func.__provider_metadata__ if hasattr(func, '__provider_metadata__') else {},
-            )
-            self.register(provider)
-
-            return func
-
+def _make_function_provider(
+    func: Callable, naming_strategy: NamingStrategy, profiles: list[str]
+) -> ComponentProvider:
+        return ComponentProvider(
+            naming_strategy(func),
+            func,
+            profiles,
+            get_type_hints(func).get("return", None),
+            _get_dependencies(func),
+            func.__provider_metadata__ if hasattr(func, '__provider_metadata__') else {},
+        )
 
 def _profiles_match(stated: list[str], selected: set[str]) -> bool:
     provided = [p for p in stated if not p.startswith("!")]
@@ -155,13 +196,6 @@ def _profiles_match(stated: list[str], selected: set[str]) -> bool:
     return not any(e in selected for e in excluded) and (
         not provided or any(p in selected for p in provided)
     )
-
-
-def _infer_name_from(name: str) -> str:
-    if name.startswith("make_"):
-        return name[5:]
-    else:
-        return name
 
 
 def _get_dependencies(func: Callable) -> list[Dependency]:

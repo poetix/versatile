@@ -124,3 +124,26 @@ def test_throws_dependency_error_on_unannotated_provider_param(registry):
         @registry.provides()
         def make_foo(_ignored):
             pass
+
+
+def test_converts_class_to_dataclass_and_registers_by_name(registry):
+    @registry.provides('user_service')
+    class UserService:
+        user_name: Annotated[str, 'user_name']
+
+    provider = registry.registered_providers()[0]
+    assert provider.name == 'user_service'
+    assert provider.dependencies == [Dependency('user_name', str, 'user_name')]
+
+    built = provider.func('Bob')
+    assert built.user_name == 'Bob'
+
+def test_registers_class_by_type(registry):
+    @registry.provides_type()
+    class UserService:
+        user_name: Annotated[str, 'user_name']
+
+    provider = registry.registered_providers()[0]
+    assert provider.name == str(UserService)
+
+
