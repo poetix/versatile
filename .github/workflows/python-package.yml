@@ -28,22 +28,30 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest
-    - name: Discover and test each subproject
+    - name: Lint all subprojects
       run: |
         for dir in */pyproject.toml; do
           project_dir=$(dirname "$dir")
-          echo "Processing $project_dir"
+          echo "Linting $project_dir"
 
           # Lint
-          echo "Running flake8 on $project_dir"
           flake8 "$project_dir" \
             --count --select=E9,F63,F7,F82 --show-source --statistics || exit 1
           flake8 "$project_dir" \
             --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-          # Install
-          echo "Installing $project_dir"
-          pip install -e "$project_dir"
+        done
+    - name: Build modules
+      run: |
+          echo "Building versatile"
+          pip install -e versatile
+          
+          echo "Building pling-repository"
+          pip install -e pling-repository
+        done
+    - name: Test modules
+      run: |
+        for dir in */pyproject.toml; do
+          project_dir=$(dirname "$dir")
 
           # Test
           echo "Testing $project_dir"
