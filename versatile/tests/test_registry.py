@@ -52,7 +52,7 @@ def uppercase_greeter(registry, component_finder):
 def test_provider_is_registered(greeter: ComponentProvider):
     assert greeter.profiles == ["test1"]
     assert greeter.func()("Dominic") == "Hello Dominic"
-    assert greeter.provided_type == Callable[[str], str]
+    assert greeter.provided_types == [Callable[[str], str]]
 
 
 def test_name_can_be_resolved_from_declaring_function_name(
@@ -68,7 +68,7 @@ def test_provider_can_have_no_return_type(
     def make_foo():
         pass
 
-    assert component_finder("foo").provided_type is None
+    assert component_finder("foo").provided_types == []
 
 
 def test_dependencies_can_be_identified_by_annotated_name(registry):

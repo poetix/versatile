@@ -31,7 +31,7 @@ def repository_builder(db):
         return MaterialisedComponent(
             component.id,
             component.name,
-            component.declared_type,
+            component.declared_types,
             make_repository(component.component, db),
             component.dependencies,
             component.metadata,

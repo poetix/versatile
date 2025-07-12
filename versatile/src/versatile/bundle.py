@@ -23,6 +23,16 @@ __all__ = ["Bundle", "BundleBuilder", "ComponentKey"]
 
 
 ComponentKey = Union[str, type]
+"""Type alias for keys used to look up components in a Bundle.
+
+Components can be retrieved either by their string name or by their type.
+When using a type as a key, it's converted to its string representation
+for internal lookup.
+
+Example:
+    >>> bundle["database"]     # Lookup by name
+    >>> bundle[Database]       # Lookup by type (converted to str(Database))
+"""
 
 
 class Bundle:
@@ -91,6 +101,15 @@ class BundleBuilder:
 
 
 def _validate_scoped_values(required_from_scope, scope_keys):
+    """Validate that the provided scope contains exactly the required items.
+    
+    Args:
+        required_from_scope: Set of dependency names that must be provided.
+        scope_keys: Set of keys actually provided in the scope dictionary.
+        
+    Raises:
+        DependencyError: If required items are missing or unexpected items are provided.
+    """
     missing_from_scope = required_from_scope - scope_keys
     if missing_from_scope:
         raise DependencyError(f"Missing items {missing_from_scope} from provided scope")

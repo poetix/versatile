@@ -1,4 +1,10 @@
-"""Utilities for constructing MaterialisedComponent objects."""
+"""Utilities for constructing MaterialisedComponent objects.
+
+This module provides the ComponentBuilder class, which is responsible for
+invoking component provider functions and transforming the results into
+MaterialisedComponent instances. It supports a transformer pattern that
+allows post-processing of components after creation.
+"""
 
 import uuid
 from functools import reduce
@@ -38,7 +44,7 @@ class ComponentBuilder:
         untransformed = MaterialisedComponent(
             uuid.uuid4(),
             provider.name,
-            provider.provided_type,
+            provider.provided_types,
             component_obj,
             list(dependencies.keys()),
             provider.metadata,

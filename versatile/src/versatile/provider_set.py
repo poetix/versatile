@@ -1,4 +1,10 @@
-"""Helpers for managing sets of providers."""
+"""Helpers for managing sets of providers.
+
+This module provides utilities for collecting component providers into
+validated sets, ensuring uniqueness constraints and resolving external
+dependencies. The ProviderSet class represents a resolved collection of
+providers ready for dependency graph analysis.
+"""
 
 from dataclasses import dataclass
 from typing import FrozenSet

@@ -28,7 +28,7 @@ class MaterialisedComponent:
     Attributes:
         id: The unique id of this component instance.
         name: The provider name.
-        declared_type: The declared type of the component.
+        declared_types: List of types this component can satisfy.
         component: The instantiated component object.
         dependencies: A list of provider names or keys this component depends on.
         metadata: Optional metadata declared on the provider.
@@ -36,7 +36,7 @@ class MaterialisedComponent:
 
     id: UUID
     name: str
-    declared_type: type
+    declared_types: list[type]
     component: Any
     dependencies: list[str]
     metadata: dict[str, Any]

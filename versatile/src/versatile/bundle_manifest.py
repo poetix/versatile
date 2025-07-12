@@ -1,4 +1,14 @@
-"""Utilities for constructing bundle build manifests."""
+"""Utilities for constructing bundle build manifests.
+
+This module provides the core dependency resolution logic for the Versatile
+framework. It analyzes provider dependencies, performs topological sorting
+to determine build order, and creates manifests that describe how to
+construct component bundles.
+
+The BundleManifest serves as a blueprint for bundle construction, containing
+all the information needed to instantiate components in the correct order
+while respecting dependency relationships.
+"""
 
 from collections import deque, defaultdict
 from dataclasses import dataclass
@@ -100,6 +110,22 @@ class BundleManifestBuilder:
         self._parent = parent
 
     def build(self, provider_set: ProviderSet) -> BundleManifest:
+        """Build a BundleManifest from a validated ProviderSet.
+        
+        Performs dependency resolution and topological sorting to determine
+        the order in which providers should be invoked. Validates that all
+        dependencies can be satisfied either by providers in the set, by
+        the parent bundle, or by externally-supplied scope.
+        
+        Args:
+            provider_set: Validated set of providers to resolve.
+            
+        Returns:
+            A BundleManifest describing how to build the bundle.
+            
+        Raises:
+            DependencyError: If provider names conflict with parent components.
+        """
         self._validate_compatibility_with_parent(provider_set)
         required_from_scope = self._get_required_from_scope(provider_set)
 
@@ -124,6 +150,14 @@ class BundleManifestBuilder:
         )
 
     def _get_required_from_scope(self, provider_set):
+        """Determine which dependencies must be supplied externally.
+        
+        Args:
+            provider_set: The ProviderSet containing dependency requirements.
+            
+        Returns:
+            Frozen set of component names that must be provided by external scope.
+        """
         return (
             {
                 component_name
@@ -164,6 +198,14 @@ class BundleManifestBuilder:
         return dependency_graph
 
     def _validate_compatibility_with_parent(self, provider_set):
+        """Ensure provider names don't conflict with parent bundle components.
+        
+        Args:
+            provider_set: The ProviderSet to validate against the parent.
+            
+        Raises:
+            DependencyError: If any provider names conflict with parent components.
+        """
         if not self._parent:
             return
 

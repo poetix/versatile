@@ -23,17 +23,21 @@ def make_manifest(
     Args:
         registry: The component provider registry containing declared providers.
         profiles: An optional set of profile names used to filter active providers.
+            If None, all providers are included regardless of profile.
         parent: An optional parent bundle containing already-materialised components.
-        scope: Optional mapping supplying objects for dependencies that are
-            required from the external scope.
-        scope: Optional mapping supplying objects for dependencies that are
-            required from the external scope.
+            Child bundles can depend on parent components but not vice versa.
 
     Returns:
-        The resolved :class:`BundleManifest` describing provider build order.
+        The resolved :class:`BundleManifest` describing provider build order
+        and external dependencies.
 
     Raises:
         DependencyError: If dependencies are ambiguous, missing, or cyclic.
+
+    Example:
+        >>> registry = ComponentProviderRegistry()
+        >>> manifest = make_manifest(registry, {"dev"})
+        >>> print(manifest.build_order)
     """
     providers_for_profiles = registry.registered_providers(profiles)
     provider_set = make_provider_set(providers_for_profiles, profiles)
