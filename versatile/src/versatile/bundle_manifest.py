@@ -127,7 +127,7 @@ class BundleManifestBuilder:
     def __init__(self, parent: Optional[ComponentSet]):
         self._parent = parent
 
-    def build(self, provider_set: ProviderSet) -> BundleManifest:
+    def build(self, provider_set: ProviderSet, require_complete: bool = True) -> BundleManifest:
         """Build a BundleManifest from a validated ProviderSet.
         
         Performs dependency resolution and topological sorting to determine
@@ -158,6 +158,13 @@ class BundleManifestBuilder:
                 resolved_providers, required_from_scope
             ).traverse()
         )
+
+        if require_complete and len(required_from_scope) > 0:
+            raise DependencyError(
+                f"Missing dependencies {required_from_scope} - "
+                "to allow dependencies to be supplied by a transient scope, "
+                "call build with require_complete set to False."
+            )
 
         return BundleManifest(
             self._parent,

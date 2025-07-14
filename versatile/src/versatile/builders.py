@@ -13,6 +13,7 @@ def make_manifest(
     registry: ComponentProviderRegistry,
     profiles: Optional[set[str]] = None,
     parent: Optional[Bundle] = None,
+    require_complete: bool = True
 ) -> BundleManifest:
     """Create a :class:`BundleManifest` for the given registry.
 
@@ -40,9 +41,9 @@ def make_manifest(
         >>> print(manifest.build_order)
     """
     providers_for_profiles = registry.registered_providers(profiles)
-    provider_set = make_provider_set(providers_for_profiles, profiles)
+    provider_set = make_provider_set(providers_for_profiles, profiles, parent is None and require_complete)
     manifest_builder = BundleManifestBuilder(parent.components if parent else None)
-    return manifest_builder.build(provider_set)
+    return manifest_builder.build(provider_set, require_complete)
 
 
 def make_bundle(
@@ -69,7 +70,7 @@ def make_bundle(
     Raises:
         DependencyError: If dependencies are ambiguous, missing, or cyclic.
     """
-    manifest = make_manifest(registry, profiles, parent)
+    manifest = make_manifest(registry, profiles, parent, parent is None and scope is None)
     bundle_builder = BundleBuilder(manifest, ComponentBuilder([]))
 
     return bundle_builder.build(scope or {})

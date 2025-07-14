@@ -37,7 +37,7 @@ class ProviderSet:
 
 
 def make_provider_set(
-    providers: list[ComponentProvider], profiles: set[str]
+    providers: list[ComponentProvider], profiles: set[str], require_complete: bool = True
 ) -> ProviderSet:
     """
     Constructs a ProviderSet from a list of ComponentProviders and an active profile set.
@@ -53,6 +53,9 @@ def make_provider_set(
     Args:
         providers: List of ComponentProvider instances to include.
         profiles: Set of active profile names (used only for error context).
+        require_complete: If True (default), then all providers' dependencies must be satisfiable by
+        other providers in the resulting ProviderSet. If False, then dependencies may be satisfied
+        by a parent bundle or transient scope.
 
     Returns:
         A fully-resolved ProviderSet containing all providers, their provided types index, and unresolved dependencies.
@@ -73,6 +76,17 @@ def make_provider_set(
 
     unsatisfied_by_name_dependencies = by_name_dependencies - providers_by_name.keys()
     unsatisfied_by_type_dependencies = by_type_dependencies - resolved_type_dependencies.keys()
+
+    if require_complete:
+        if len(unsatisfied_by_name_dependencies) > 0 or len(unsatisfied_by_type_dependencies) > 0:
+            unsatisfied = unsatisfied_by_name_dependencies.union(
+                type.__name__ for type in unsatisfied_by_type_dependencies
+            )
+            raise DependencyError(
+                f"Provider set has unsatisfied dependencies: {unsatisfied} - "
+                "to allow dependencies to be supplied by a parent bundle or transient scope, "
+                "call make_provider_set with require_complete set to False."
+            )
 
     return ProviderSet(
         providers_by_name,

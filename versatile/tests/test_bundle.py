@@ -106,7 +106,7 @@ def test_missing_dependency_raises():
 
     with pytest.raises(
         DependencyError,
-        match="Unsatisfied type dependencies: \['Printer'\]",
+        match="Provider set has unsatisfied dependencies: {'Printer'}",
     ):
         make_bundle(registry)
 
