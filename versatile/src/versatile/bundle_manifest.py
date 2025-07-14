@@ -244,13 +244,13 @@ class BundleManifestBuilder:
                 raise DependencyError(
                     f"Unsatisfied type dependencies: {[dep.__name__ for dep in provider_set.unsatisfied_by_type_dependencies]}"
                 )
-            return provider_set.unique_providers_by_type
+            return provider_set.resolved_type_dependencies
 
         aliased_types = {
-            unique_provider_type: (provider_name, self._parent.components_of_type(unique_provider_type))
-            for unique_provider_type, provider_name
-            in provider_set.unique_providers_by_type.items()
-            if self._parent.provides_type(unique_provider_type)
+            resolved_type: (provider_name, self._parent.components_of_type(resolved_type))
+            for resolved_type, provider_name
+            in provider_set.resolved_type_dependencies.items()
+            if self._parent.provides_type(resolved_type)
         }
 
         if len(aliased_types) > 0:
@@ -258,7 +258,7 @@ class BundleManifestBuilder:
                 f"Provider types {aliased_types} alias types also provided by parent bundle"
             )
 
-        unique_providers_by_type = dict(provider_set.unique_providers_by_type)
+        resolved_type_dependencies = dict(provider_set.resolved_type_dependencies)
         for unresolved_type in provider_set.unsatisfied_by_type_dependencies:
             candidates = self._parent.components_of_type(unresolved_type)
             if len(candidates) > 1:
@@ -266,11 +266,11 @@ class BundleManifestBuilder:
                     f"Multiple candidates for dependency on type {unresolved_type}: {candidates}"
                 )
             if len(candidates) == 1:
-                unique_providers_by_type[unresolved_type] = candidates[0].name
+                resolved_type_dependencies[unresolved_type] = candidates[0].name
 
-        if len(unique_providers_by_type) < len(provider_set.unsatisfied_by_type_dependencies):
+        if len(resolved_type_dependencies) < len(provider_set.unsatisfied_by_type_dependencies):
             raise DependencyError(
-                f"Unsatisfied type dependencies: {provider_set.unsatisfied_by_type_dependencies - unique_providers_by_type.keys()}"
+                f"Unsatisfied type dependencies: {provider_set.unsatisfied_by_type_dependencies - resolved_type_dependencies.keys()}"
             )
 
-        return unique_providers_by_type
+        return resolved_type_dependencies

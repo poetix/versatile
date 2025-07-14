@@ -24,13 +24,14 @@ class ProviderSet:
 
     Attributes:
         providers_by_name: Mapping from provider names to their ComponentProviders.
-        unique_providers_by_type: Mapping from provided types to the unique provider names that provide them.
+        resolved_type_dependencies: Mapping from types to provider names for type-based dependencies
+            that were resolved within this provider set.
         unsatisfied_by_name_dependencies: Set of by-name dependencies that are not satisfied by the provider set.
         unsatisfied_by_type_dependencies: Set of by-type dependencies that are not satisfied by the provider set.
     """
 
     providers_by_name: dict[str, ComponentProvider]
-    unique_providers_by_type: dict[type, str]
+    resolved_type_dependencies: dict[type, str]
     unsatisfied_by_name_dependencies: FrozenSet[str]
     unsatisfied_by_type_dependencies: FrozenSet[type]
 
@@ -68,26 +69,39 @@ def make_provider_set(
     }
 
     by_type_dependencies = _by_type_dependencies(providers)
-    unique_providers_by_type = _unique_providers_by_type(by_type_dependencies, providers, profiles)
+    resolved_type_dependencies = _resolved_type_dependencies(by_type_dependencies, providers, profiles)
 
     unsatisfied_by_name_dependencies = by_name_dependencies - providers_by_name.keys()
-    unsatisfied_by_type_dependencies = by_type_dependencies - unique_providers_by_type.keys()
+    unsatisfied_by_type_dependencies = by_type_dependencies - resolved_type_dependencies.keys()
 
     return ProviderSet(
         providers_by_name,
-        unique_providers_by_type,
+        resolved_type_dependencies,
         frozenset(unsatisfied_by_name_dependencies),
         frozenset(unsatisfied_by_type_dependencies)
     )
 
 
-def _unique_providers_by_type(by_type_dependencies, providers, profiles):
+def _resolved_type_dependencies(by_type_dependencies, providers, profiles):
+    """Resolve type-based dependencies to unique provider names.
+    
+    Args:
+        by_type_dependencies: Mapping of types to dependencies that need them.
+        providers: List of available providers.
+        profiles: Active profiles (for error reporting).
+        
+    Returns:
+        Dictionary mapping types to the unique provider names that satisfy them.
+        
+    Raises:
+        DependencyError: If multiple providers can satisfy the same type dependency.
+    """
     providers_by_type: dict[type, set[str]] = defaultdict(set)
     for provider in providers:
         for provided_type in provider.provided_types:
             providers_by_type[provided_type].add(provider.name)
 
-    unique_providers_by_type: dict[type, str] = {}
+    resolved_type_dependencies: dict[type, str] = {}
     for depended_on_type, dependencies in by_type_dependencies.items():
         provider_names = providers_by_type[depended_on_type]
         if len(provider_names) > 1:
@@ -101,8 +115,8 @@ def _unique_providers_by_type(by_type_dependencies, providers, profiles):
                 f"in profiles {profiles}"
             )
         if len(provider_names) == 1:
-            unique_providers_by_type[depended_on_type] = next(iter(provider_names))
-    return unique_providers_by_type
+            resolved_type_dependencies[depended_on_type] = next(iter(provider_names))
+    return resolved_type_dependencies
 
 
 def _by_type_dependencies(providers):

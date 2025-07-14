@@ -227,3 +227,76 @@ def test_scope_extraneous_dependency_raises():
 
     with pytest.raises(DependencyError, match="Unexpected items {'foo'}"):
         make_bundle(registry, scope={"lhs": 1, "foo": 2})
+
+
+def test_raises_if_child_provider_aliases_parent_type_for_type_dependency():
+    """Test that providing the same type as parent raises error when type-based dependency exists."""
+    parent_registry = ComponentProviderRegistry()
+    child_registry = ComponentProviderRegistry()
+    consumer_registry = ComponentProviderRegistry()
+
+    # Parent provides a Printer component
+    class Printer:
+        def print(self, msg: str) -> str:
+            return f"Parent: {msg}"
+
+    @parent_registry.provides("parent_printer")
+    def make_parent_printer() -> Printer:
+        return Printer()
+
+    # Child also provides a Printer component (different name, same type)
+    @child_registry.provides("child_printer")
+    def make_child_printer() -> Printer:
+        return Printer()
+
+    # Consumer has type-based dependency on Printer (no name specified)
+    @consumer_registry.provides("service")
+    def make_service(printer: Printer) -> str:  # Type-based dependency, no Annotated
+        return printer.print("hello")
+
+    parent_bundle = make_bundle(parent_registry)
+    child_bundle = make_bundle(child_registry, parent=parent_bundle)
+
+    # This should fail because consumer needs Printer by type,
+    # but both parent and child provide Printer type, making it ambiguous
+    with pytest.raises(
+            DependencyError,
+            match=r"Multiple candidates for dependency on type",
+    ):
+        make_bundle(consumer_registry, parent=child_bundle)
+
+
+def test_raises_if_child_provider_aliases_parent_type_for_satisfied_dependency():
+    """Test early detection when child provides type that parent also provides for a type dependency."""
+    parent_registry = ComponentProviderRegistry()
+    child_registry = ComponentProviderRegistry()
+
+    class Service:
+        pass
+
+    # Parent provides Service
+    @parent_registry.provides("parent_service")
+    def make_parent_service() -> Service:
+        return Service()
+
+    # Child also provides Service, and has a type-based dependency on it
+    @child_registry.provides("child_service")
+    def make_child_service() -> Service:
+        return Service()
+
+    @child_registry.provides("consumer")
+    def make_consumer(service: Service) -> str:  # Type-based dependency on Service
+        return "result"
+
+    parent_bundle = make_bundle(parent_registry)
+
+    # This should fail because:
+    # 1. Child registry has unsatisfied type dependency on Service
+    # 2. Child registry also provides Service type
+    # 3. Parent bundle also provides Service type
+    # This creates ambiguity for the type-based dependency resolution
+    with pytest.raises(
+            DependencyError,
+            match=r"Provider types .* alias types also provided by parent bundle",
+    ):
+        make_bundle(child_registry, parent=parent_bundle)
