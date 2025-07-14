@@ -85,10 +85,9 @@ def test_dependencies_can_be_identified_by_type_name(registry):
     def foo(name: str) -> str:
         pass
 
-    assert (
-        registry.registered_providers()[0].dependencies[0].component_name
-        == "<class 'str'>"
-    )
+    dependency = registry.registered_providers()[0].dependencies[0]
+    assert dependency.component_name is None
+    assert dependency.declared_type == str
 
 
 def test_retrieve_components_by_profile(registry):
@@ -118,12 +117,14 @@ def test_retrieve_components_by_profile(registry):
     assert components_in("empty") == {"globally_defined", "not_test"}
 
 
-def test_throws_dependency_error_on_unannotated_provider_param(registry):
-    with pytest.raises(DependencyError, match="Dependency.*is not annotated"):
+def test_unannotated_parameter_maps_to_untyped_dependency_with_parameter_name(registry):
+    @registry.provides()
+    def make_foo(_ignored):
+        pass
 
-        @registry.provides()
-        def make_foo(_ignored):
-            pass
+    dependency = registry.registered_providers()[0].dependencies[0]
+    assert dependency.component_name == "_ignored"
+    assert dependency.declared_type is None
 
 
 def test_converts_class_to_dataclass_and_registers_by_name(registry):
@@ -139,11 +140,11 @@ def test_converts_class_to_dataclass_and_registers_by_name(registry):
     assert built.user_name == 'Bob'
 
 def test_registers_class_by_type(registry):
-    @registry.provides_type()
+    @registry.provides()
     class UserService:
         user_name: Annotated[str, 'user_name']
 
     provider = registry.registered_providers()[0]
-    assert provider.name == str(UserService)
+    assert provider.name == 'UserService'
 
 

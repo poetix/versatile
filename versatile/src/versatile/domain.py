@@ -1,7 +1,7 @@
 """Domain models used throughout the framework."""
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 from uuid import UUID
 
 
@@ -16,8 +16,8 @@ class Dependency:
     """
 
     parameter_name: str
-    declared_type: type
-    component_name: str
+    declared_type: Optional[type]
+    component_name: Optional[str]
 
 
 @dataclass(frozen=True)

@@ -16,6 +16,7 @@ from typing import Any, Union
 from versatile.bundle_manifest import BundleManifest
 from versatile.component_builder import ComponentBuilder
 from versatile.component_set import ComponentSet
+from versatile.domain import MaterialisedComponent
 
 from versatile.errors import DependencyError
 
@@ -42,18 +43,25 @@ class Bundle:
     Bundles may be layered: a child bundle may inherit and resolve dependencies from
     its parent, allowing scoped resolution across session or request boundaries.
 
-    Components are registered by name. If a provider is decorated with
-    :meth:`~versatile.registry.ComponentProviderRegistry.provides_type`, the
-    string representation of its annotated return type becomes that name.
-    ``__getitem__`` converts a type key to a string for lookup, enabling
-    retrieval using the same type supplied at registration.
+    Components are registered by unique name and by type. If a component is requested by type,
+    there must be a unique component of that type in the bundle; otherwise a KeyError will be raised.
     """
 
     def __init__(self, components: ComponentSet):
         self.components = components
 
     def __getitem__(self, key: ComponentKey) -> Any:
-        return self.components[key if isinstance(key, str) else str(key)].component
+        if isinstance(key, str):
+            return self.components[key].component
+        if isinstance(key, type):
+            candidates = self.components.components_of_type(key)
+            if len(candidates) == 0:
+                raise KeyError(key)
+            if len(candidates) > 1:
+                raise KeyError(f"No unique component found for type {key}")
+            return candidates[0].component
+        raise TypeError(f"Invalid component key type: {key}")
+
 
 
 class BundleBuilder:
@@ -81,20 +89,23 @@ class BundleBuilder:
         built: dict[str, Any] = {}
         parent = self._manifest.parent
 
-        def get_dependency(name: str) -> Any:
+        def get_component(name: str) -> tuple[str, Any]:
             if name in required_from_scope:
                 return scope[name]
             if parent and name in parent:
                 return parent[name].component
             return built[name].component
 
-        for component_name, dependency_names in self._manifest.build_order:
-            looked_up_dependencies = {
-                dependency_name: get_dependency(dependency_name)
-                for dependency_name in dependency_names
+        for component_name in self._manifest.build_order:
+            resolved_provider = self._manifest.resolved_providers[component_name]
+
+            looked_up_components = {
+                dependency_name: get_component(dependency_name)
+                for dependency_name in resolved_provider.resolved_dependencies.values()
             }
+
             built[component_name] = self._component_builder.build(
-                self._manifest.providers[component_name], looked_up_dependencies
+                resolved_provider, looked_up_components
             )
 
         return Bundle(ComponentSet(built, parent))

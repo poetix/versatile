@@ -34,22 +34,22 @@ class Service:
 def registry() -> ComponentProviderRegistry:
     registry = ComponentProviderRegistry()
 
-    @registry.provides_type(profiles=["test"])
+    @registry.provides(profiles=["test"])
     def make_test_db() -> DB:
         def db(_user_id: str) -> dict[str, Any]:
             return {"name": "Arthur Putey", "age": 42}
 
         return db
 
-    @registry.provides_type(profiles=["uat"])
+    @registry.provides(profiles=["uat"])
     def make_uat_db() -> DB:
         def db(_user_id: str) -> dict:
             return {"name": "Gawain of Camelot", "age": 23}
 
         return db
 
-    registry.provides_supertype(profiles=["test"])(MockPrinter)
-    registry.provides_type()(Service)
+    registry.provides(profiles=["test"])(MockPrinter)
+    registry.provides()(Service)
 
     return registry
 
@@ -100,13 +100,13 @@ def test_dependency_cycle_detected():
 def test_missing_dependency_raises():
     registry = ComponentProviderRegistry()
 
-    @registry.provides_type()
+    @registry.provides()
     def make_service(printer: Printer) -> Service:
-        return lambda _: None
+        return ...
 
     with pytest.raises(
         DependencyError,
-        match="Missing items.*",
+        match="Unsatisfied type dependencies: \['Printer'\]",
     ):
         make_bundle(registry)
 

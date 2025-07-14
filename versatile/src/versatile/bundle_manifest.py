@@ -16,8 +16,26 @@ from typing import Optional, FrozenSet, Iterable
 
 from versatile.component_set import ComponentSet
 from versatile.errors import DependencyError
-from versatile.provider_set import ProviderSet, make_provider_set
+from versatile.provider_set import ProviderSet
 from versatile.registry import ComponentProvider
+
+
+__all__ = ["ResolvedComponentProvider", "BundleManifest", "BundleManifestBuilder"]
+
+@dataclass(frozen=True)
+class ResolvedComponentProvider:
+    provider: ComponentProvider
+    resolved_dependencies: dict[str, str]
+
+    @staticmethod
+    def from_provider(
+        provider: ComponentProvider, resolved_type_lookup: dict[type, str]
+    ) -> "ResolvedComponentProvider":
+        return ResolvedComponentProvider(provider, {
+            dependency.parameter_name: (
+                    dependency.component_name or resolved_type_lookup[dependency.declared_type]
+            ) for dependency in provider.dependencies
+        })
 
 
 @dataclass(frozen=True)
@@ -30,11 +48,11 @@ class BundleManifest:
     required_from_scope: FrozenSet[str]
     """Names of dependencies that must be supplied by the caller."""
 
-    providers: dict[str, ComponentProvider]
+    resolved_providers: dict[str, ResolvedComponentProvider]
     """Provider functions keyed by the component name they produce."""
 
-    build_order: list[tuple[str, list[str]]]
-    """Ordered list describing which providers to invoke and their dependencies."""
+    build_order: list[str]
+    """Ordered list of providers to invoke."""
 
 
 class _DependencyGraph:
@@ -127,29 +145,28 @@ class BundleManifestBuilder:
             DependencyError: If provider names conflict with parent components.
         """
         self._validate_compatibility_with_parent(provider_set)
+        resolved_type_lookup = self._resolve_type_dependencies(provider_set)
         required_from_scope = self._get_required_from_scope(provider_set)
 
-        resolved_dependencies = {
-            provider_name: [
-                dependency.component_name for dependency in provider.dependencies
-            ]
+        resolved_providers: dict[str, ResolvedComponentProvider] = {
+            provider_name: ResolvedComponentProvider.from_provider(provider, resolved_type_lookup)
             for provider_name, provider in provider_set.providers_by_name.items()
         }
-        build_order = [
-            (dep, resolved_dependencies[dep])
-            for dep in self._build_dependency_graph(
-                resolved_dependencies, required_from_scope
+
+        build_order = list(
+            self._build_dependency_graph(
+                resolved_providers, required_from_scope
             ).traverse()
-        ]
+        )
 
         return BundleManifest(
             self._parent,
             required_from_scope,
-            provider_set.providers_by_name,
+            resolved_providers,
             build_order,
         )
 
-    def _get_required_from_scope(self, provider_set):
+    def _get_required_from_scope(self, provider_set) -> FrozenSet[str]:
         """Determine which dependencies must be supplied externally.
         
         Args:
@@ -158,18 +175,18 @@ class BundleManifestBuilder:
         Returns:
             Frozen set of component names that must be provided by external scope.
         """
-        return (
+        return frozenset(
             {
                 component_name
-                for component_name in provider_set.required_components
+                for component_name in provider_set.unsatisfied_by_name_dependencies
                 if component_name not in self._parent
             }
             if self._parent
-            else provider_set.required_components
+            else provider_set.unsatisfied_by_name_dependencies
         )
 
     def _build_dependency_graph(
-        self, dependencies: dict[str, list[str]], provided_from_scope
+        self, resolved_providers: dict[str, ResolvedComponentProvider], provided_from_scope
     ) -> _DependencyGraph:
         """
         Construct a dependency graph where each provider maps to the set of provider names it depends on.
@@ -182,7 +199,8 @@ class BundleManifestBuilder:
         """
         dependency_graph: _DependencyGraph = _DependencyGraph()
 
-        for provider_name, dependency_names in dependencies.items():
+        for provider_name, resolved_provider in resolved_providers.items():
+            dependency_names = resolved_provider.resolved_dependencies.values()
             dependency_graph.add_dependencies(
                 provider_name,
                 (
@@ -219,3 +237,40 @@ class BundleManifestBuilder:
             raise DependencyError(
                 f"Provider names {conflicts} conflict with component in parent bundle"
             )
+
+    def _resolve_type_dependencies(self, provider_set) -> dict[type, str]:
+        if not self._parent:
+            if len(provider_set.unsatisfied_by_type_dependencies) > 0:
+                raise DependencyError(
+                    f"Unsatisfied type dependencies: {[dep.__name__ for dep in provider_set.unsatisfied_by_type_dependencies]}"
+                )
+            return provider_set.unique_providers_by_type
+
+        aliased_types = {
+            unique_provider_type: (provider_name, self._parent.components_of_type(unique_provider_type))
+            for unique_provider_type, provider_name
+            in provider_set.unique_providers_by_type.items()
+            if self._parent.provides_type(unique_provider_type)
+        }
+
+        if len(aliased_types) > 0:
+            raise DependencyError(
+                f"Provider types {aliased_types} alias types also provided by parent bundle"
+            )
+
+        unique_providers_by_type = dict(provider_set.unique_providers_by_type)
+        for unresolved_type in provider_set.unsatisfied_by_type_dependencies:
+            candidates = self._parent.components_of_type(unresolved_type)
+            if len(candidates) > 1:
+                raise DependencyError(
+                    f"Multiple candidates for dependency on type {unresolved_type}: {candidates}"
+                )
+            if len(candidates) == 1:
+                unique_providers_by_type[unresolved_type] = candidates[0].name
+
+        if len(unique_providers_by_type) < len(provider_set.unsatisfied_by_type_dependencies):
+            raise DependencyError(
+                f"Unsatisfied type dependencies: {provider_set.unsatisfied_by_type_dependencies - unique_providers_by_type.keys()}"
+            )
+
+        return unique_providers_by_type
