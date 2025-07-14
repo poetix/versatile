@@ -20,7 +20,7 @@ def make_real_db() -> DB:
 
 
 @registry.provides()
-def make_service(db: Annotated[DB, "db"]) -> Service:
+def make_service(db: DB) -> Service:
     return lambda user_id: f"Welcome, {db(user_id)['name']}!"
 
 
@@ -28,5 +28,5 @@ def make_service(db: Annotated[DB, "db"]) -> Service:
 global_bundle = make_bundle(registry, {"test"})  # Change to e.g. 'prod' for non-test db
 
 # Use the resolved service
-service = global_bundle["service"]
-print(service("u001"))  # Welcome, Arthur
+service = global_bundle[Service]
+print(service("u001"))  # Welcome, Arthur!

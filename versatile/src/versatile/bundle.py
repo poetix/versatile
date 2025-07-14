@@ -53,14 +53,12 @@ class Bundle:
     def __getitem__(self, key: ComponentKey) -> Any:
         if isinstance(key, str):
             return self.components[key].component
-        if isinstance(key, type):
-            candidates = self.components.components_of_type(key)
-            if len(candidates) == 0:
-                raise KeyError(key)
-            if len(candidates) > 1:
-                raise KeyError(f"No unique component found for type {key}")
-            return candidates[0].component
-        raise TypeError(f"Invalid component key type: {key}")
+        candidates = self.components.components_of_type(key)
+        if len(candidates) == 0:
+            raise KeyError(key)
+        if len(candidates) > 1:
+            raise KeyError(f"No unique component found for type {key}")
+        return candidates[0].component
 
 
 
