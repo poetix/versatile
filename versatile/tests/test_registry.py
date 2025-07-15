@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Callable, Annotated
 
 import pytest
@@ -127,8 +128,9 @@ def test_unannotated_parameter_maps_to_untyped_dependency_with_parameter_name(re
     assert dependency.declared_type is None
 
 
-def test_converts_class_to_dataclass_and_registers_by_name(registry):
+def test_registers_class_by_name(registry):
     @registry.provides("user_service")
+    @dataclass(frozen=True)
     class UserService:
         user_name: Annotated[str, "user_name"]
 

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Callable, Any, Annotated
 
 import pytest
@@ -23,6 +24,7 @@ class MockPrinter(Printer):
             self.printed.append(f"{k}: {v}")
 
 
+@dataclass(frozen=True)
 class Service:
     db: DB
     printer: Printer
