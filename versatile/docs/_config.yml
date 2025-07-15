@@ -1,0 +1,17 @@
+theme: jekyll-theme-minimal
+title: Versatile
+description: A lightweight dependency injection framework for Python
+github:
+  repository_url: https://github.com/poetix/versatile
+  repository_name: poetix/versatile
+
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+
+markdown: kramdown
+highlighter: rouge
+
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
