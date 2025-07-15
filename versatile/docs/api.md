@@ -48,21 +48,13 @@ Immutable container of materialized components.
 
 ```python
 class Bundle:
-    def __getitem__(self, key: Union[str, type]) -> Any
-    def __contains__(self, key: Union[str, type]) -> bool
-    def __iter__(self) -> Iterator[tuple[str, Any]]
-    def items(self) -> Iterator[tuple[str, Any]]
-    
-    @property
-    def components(self) -> ComponentSet
-```
+    def __getitem__(self, key: ComponentKey) -> Any
+    def __contains__(self, key: ComponentKey) -> bool
+```    
 
 **Methods:**
 - `__getitem__(key)`: Get component by name or type
 - `__contains__(key)`: Check if component exists
-- `__iter__()`: Iterate over (name, component) pairs
-- `items()`: Get all (name, component) pairs
-- `components`: Get ComponentSet for introspection
 
 ### Dependency
 
@@ -129,28 +121,6 @@ def make_manifest(
 
 **Raises:** `DependencyError` if dependencies are ambiguous, missing, or cyclic
 
-## Utility Functions
-
-### inferred_name
-
-Derive component name from class or function name.
-
-```python
-def inferred_name(target: Any) -> str
-```
-
-Removes 'make_' prefix from function names. Returns class name for classes.
-
-### name_from_supertype
-
-Derive component name from the first base class.
-
-```python
-def name_from_supertype(target: Any) -> str
-```
-
-**Raises:** `ValueError` if target is not a class
-
 ## Exceptions
 
 ### DependencyError
@@ -168,36 +138,5 @@ Common error scenarios:
 - Type conflicts (multiple providers for same type)
 - Name conflicts (duplicate component names)
 - Parent-child aliasing conflicts
-
-## Type Annotations
-
-### Common Types
-
-```python
-from typing import Optional, Any, Callable, Union, Iterator, FrozenSet
-from dataclasses import dataclass
-```
-
-### Profile Types
-
-```python
-ProfileSet = set[str]
-ProfileList = list[str]
-```
-
-### Component Access
-
-```python
-ComponentKey = Union[str, type]
-ComponentItem = tuple[str, Any]
-```
-
-## Constants
-
-### Default Behavior
-
-- `require_complete`: `True` for root bundles, `False` for child/scoped bundles
-- Profile matching: Empty profiles match all selected profiles
-- Naming: Function names with 'make_' prefix have it removed
 
 [← Previous: Advanced Usage](advanced.md) | [Next: Examples →](examples.md)

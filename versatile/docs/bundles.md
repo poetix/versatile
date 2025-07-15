@@ -38,12 +38,16 @@ request_bundle = make_bundle(request_registry, parent=global_bundle)
 transaction_bundle = make_bundle(transaction_registry, parent=request_bundle)
 ```
 
+TODO: expose bundle manifest creation function and explain how it can be used to make this more efficient by pre-validating and precalculating build-order.
+
 ### Parent-Child Rules
 
-- Child bundles can depend on parent components
-- Parent bundles cannot depend on child components
-- Child components can override parent components by type
-- Name conflicts between parent and child are not allowed
+- Child bundles can depend on parent components.
+- Parent bundles cannot depend on child components.
+- Name conflicts between parent and child are not allowed.
+- Resolving a dependencies by type requires a unique instance of that type in the bundle hierarchy up to the current bundle. Child bundles can introduce other components implementing the same type, but will not then be able to resolve further dependencies of that type.
+
+TODO: note whenever a type has been used for unique dependency resolution, and forbid child bundles to introduce new components of that type.
 
 ## Accessing Components
 
@@ -70,20 +74,7 @@ if "optional_service" in bundle:
 
 ## Bundle Inspection
 
-### List All Components
-
-```python
-for name, component in bundle.items():
-    print(f"{name}: {type(component)}")
-```
-
-### Get Component Metadata
-
-```python
-component_set = bundle.components
-for component in component_set:
-    print(f"{component.name}: {component.declared_types}")
-```
+TODO: not implemented yet.
 
 ## Dependency Completion
 

@@ -22,10 +22,11 @@ def make_redis_cache() -> Cache:
 
 ### Class Providers
 
-Register classes directly. They are automatically wrapped with `@dataclass`:
+Register classes directly. Their `__init__` methods are used as provider functions.
 
 ```python
 @registry.provides()
+@dataclass()
 class UserService:
     db: Database
     cache: Cache
@@ -126,14 +127,6 @@ class UserService(BaseService):
 
 ## Metadata
 
-Attach arbitrary metadata to providers:
-
-```python
-@registry.provides()
-def make_database() -> Database:
-    db = Database()
-    db.__provider_metadata__ = {"timeout": 30, "pool_size": 10}
-    return db
-```
+TODO: explain how custom decorators can add metadata to providers, which is then passed through to their provided components.
 
 [← Previous: Core Concepts](concepts.md) | [Next: Bundle Management →](bundles.md)

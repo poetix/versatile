@@ -1,11 +1,13 @@
 # Examples
 
+TODO: verify these actually work.
+
 ## Basic Web Service
 
 ```python
 from versatile.registry import ComponentProviderRegistry
 from versatile.builders import make_bundle
-from typing import Annotated
+from dataclasses import dataclass
 
 # Create registry
 registry = ComponentProviderRegistry()
@@ -31,6 +33,7 @@ def make_cache(config: dict) -> Cache:
 
 # Business services
 @registry.provides()
+@dataclass(frozen=True)
 class UserService:
     db: Database
     cache: Cache
@@ -108,6 +111,9 @@ test_bundle = make_bundle(base_registry, profiles={"test"})
 
 ## Request-Scoped Components
 
+NOTE: the below looks like it might work, but doesn't actually (thanks, Claude!).
+TODO: make this actually work
+
 ```python
 from flask import Flask, g, request
 
@@ -167,196 +173,6 @@ def get_user(user_id):
 
 ## Testing with Mocks
 
-```python
-import pytest
-from unittest.mock import Mock
-
-# Production registry
-prod_registry = ComponentProviderRegistry()
-
-@prod_registry.provides()
-def make_email_service() -> EmailService:
-    return SMTPEmailService()
-
-@prod_registry.provides()
-def make_payment_service() -> PaymentService:
-    return StripePaymentService()
-
-@prod_registry.provides()
-class OrderService:
-    email_service: EmailService
-    payment_service: PaymentService
-    
-    def process_order(self, order: Order) -> bool:
-        # Process payment
-        payment_result = self.payment_service.charge(order.total)
-        if not payment_result.success:
-            return False
-        
-        # Send confirmation email
-        self.email_service.send_confirmation(order.customer_email, order)
-        return True
-
-# Test registry with mocks
-def create_test_registry():
-    test_registry = ComponentProviderRegistry()
-    
-    # Mock email service
-    @test_registry.provides()
-    def make_mock_email_service() -> EmailService:
-        mock = Mock(spec=EmailService)
-        mock.send_confirmation = Mock()
-        return mock
-    
-    # Mock payment service
-    @test_registry.provides()
-    def make_mock_payment_service() -> PaymentService:
-        mock = Mock(spec=PaymentService)
-        mock.charge = Mock(return_value=PaymentResult(success=True))
-        return mock
-    
-    # Use real OrderService
-    test_registry.register(prod_registry.registered_providers()[2])  # OrderService
-    
-    return test_registry
-
-def test_order_processing():
-    test_registry = create_test_registry()
-    bundle = make_bundle(test_registry)
-    
-    order_service = bundle[OrderService]
-    email_service = bundle[EmailService]
-    payment_service = bundle[PaymentService]
-    
-    # Create test order
-    order = Order(customer_email="test@example.com", total=100.0)
-    
-    # Process order
-    result = order_service.process_order(order)
-    
-    # Verify results
-    assert result is True
-    payment_service.charge.assert_called_once_with(100.0)
-    email_service.send_confirmation.assert_called_once_with("test@example.com", order)
-```
-
-## Plugin System
-
-```python
-from abc import ABC, abstractmethod
-
-# Plugin interface
-class Plugin(ABC):
-    @abstractmethod
-    def initialize(self) -> None:
-        pass
-    
-    @abstractmethod
-    def get_name(self) -> str:
-        pass
-
-# Plugin implementations
-class LoggingPlugin(Plugin):
-    def initialize(self) -> None:
-        print("Logging plugin initialized")
-    
-    def get_name(self) -> str:
-        return "logging"
-
-class MetricsPlugin(Plugin):
-    def initialize(self) -> None:
-        print("Metrics plugin initialized")
-    
-    def get_name(self) -> str:
-        return "metrics"
-
-# Plugin registry
-def create_plugin_registry(enabled_plugins: set[str]) -> ComponentProviderRegistry:
-    registry = ComponentProviderRegistry()
-    
-    if "logging" in enabled_plugins:
-        registry.register(ComponentProvider(
-            "logging_plugin", LoggingPlugin, [], [Plugin, LoggingPlugin], [], {}
-        ))
-    
-    if "metrics" in enabled_plugins:
-        registry.register(ComponentProvider(
-            "metrics_plugin", MetricsPlugin, [], [Plugin, MetricsPlugin], [], {}
-        ))
-    
-    return registry
-
-# Application with plugins
-@registry.provides()
-class Application:
-    plugins: list[Plugin]
-    
-    def __init__(self):
-        self.plugins = []
-    
-    def start(self):
-        for plugin in self.plugins:
-            plugin.initialize()
-        print("Application started")
-
-# Dynamic plugin loading
-def create_app_with_plugins(enabled_plugins: set[str]) -> Application:
-    plugin_registry = create_plugin_registry(enabled_plugins)
-    bundle = make_bundle(plugin_registry)
-    
-    app = Application()
-    
-    # Collect all plugins
-    for name, component in bundle.items():
-        if isinstance(component, Plugin):
-            app.plugins.append(component)
-    
-    return app
-
-# Usage
-app = create_app_with_plugins({"logging", "metrics"})
-app.start()
-```
-
-## Async Components
-
-```python
-import asyncio
-from typing import AsyncContextManager
-
-# Async components
-@registry.provides()
-async def make_async_database() -> AsyncDatabase:
-    db = AsyncDatabase()
-    await db.connect()
-    return db
-
-@registry.provides()
-class AsyncUserService:
-    db: AsyncDatabase
-    
-    async def get_user(self, user_id: str) -> User:
-        return await self.db.query("SELECT * FROM users WHERE id = $1", user_id)
-
-# Async bundle creation
-async def create_async_bundle():
-    bundle = make_bundle(registry)
-    
-    # Initialize async components
-    for name, component in bundle.items():
-        if hasattr(component, '__aenter__'):
-            await component.__aenter__()
-    
-    return bundle
-
-# Usage
-async def main():
-    bundle = await create_async_bundle()
-    service = bundle[AsyncUserService]
-    user = await service.get_user("123")
-    print(user)
-
-asyncio.run(main())
-```
+TODO: show how this is easily done with profiles.
 
 [← Previous: API Reference](api.md) | [Back to Home](index.md)

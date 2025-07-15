@@ -71,9 +71,9 @@ def make_service(db: Database) -> Service:
 
 Versatile uses a three-stage validation approach:
 
-1. **ProviderSet**: Validates provider uniqueness and type conflicts
-2. **BundleManifest**: Resolves dependencies and determines build order
-3. **Bundle**: Materializes components in dependency order
+1. **ProviderSet**: Validates provided component-name uniqueness, and detects type-based dependencies that would be unresolvable for the given set of providers (since more than one provider in the set provides a component of the required type).
+2. **BundleManifest**: Resolves dependencies and determines build order.
+3. **Bundle**: Materializes components in dependency order.
 
 ## Fail-Fast Behavior
 

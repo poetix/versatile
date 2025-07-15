@@ -133,13 +133,7 @@ Each scope level has access to:
 - Parent components
 - Explicitly provided scope dependencies
 
-```python
-# Transaction bundle has access to:
-# - Transaction components (transaction)
-# - Request components (session)
-# - Global components (database, cache)
-# - Scope dependencies (current_request)
-```
+Transient scope dependencies are _not_ visible to children of the scope into which they were injected.
 
 ## Profile Combinations
 
@@ -159,25 +153,6 @@ bundle = make_bundle(registry, profiles={"dev"})
 
 # Not active in dev + CI
 bundle = make_bundle(registry, profiles={"dev", "ci"})
-```
-
-### Profile Hierarchy
-
-```python
-# Base configuration
-@registry.provides(profiles=["!test"])
-def make_base_config() -> Config:
-    return Config(debug=False)
-
-# Development overrides
-@registry.provides(profiles=["dev"])
-def make_dev_config() -> Config:
-    return Config(debug=True, log_level="DEBUG")
-
-# Test overrides
-@registry.provides(profiles=["test"])
-def make_test_config() -> Config:
-    return Config(debug=True, in_memory=True)
 ```
 
 [← Previous: Bundle Management](bundles.md) | [Next: Advanced Usage →](advanced.md)
