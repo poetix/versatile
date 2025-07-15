@@ -162,13 +162,14 @@ class ComponentProviderRegistry:
             def make_thing() -> Thing:
                 return Thing()
         """
+        profiles = profiles or []
+
         def decorator(obj):
             provided_name = name or inferred_name(obj)
             if inspect.isclass(obj):
-                obj = dataclass()(obj)
-                provider = _make_class_provider(obj, provided_name, profiles or [])
+                provider = _make_class_provider(obj, provided_name, profiles)
             elif inspect.isfunction(obj):
-                provider = _make_function_provider(obj, provided_name, profiles or [])
+                provider = _make_function_provider(obj, provided_name, profiles)
             else:
                 raise DependencyError(f"{obj} is not a class or function")
 
@@ -212,7 +213,7 @@ def _make_function_provider(
     
     Args:
         func: The function to convert to a provider.
-        naming_strategy: Strategy for determining the component name.
+        component_name: the name to give the provided component.
         profiles: List of profiles for which the provider is active.
         
     Returns:
