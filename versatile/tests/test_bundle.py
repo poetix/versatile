@@ -8,6 +8,7 @@ from versatile.registry import ComponentProviderRegistry
 
 DB = Callable[[str], dict[str, Any]]
 
+
 class Printer:
     def print(self, line):
         pass
@@ -29,6 +30,7 @@ class Service:
     def print_user_details(self, user_id):
         user_details = self.db(user_id)
         self.printer.print(user_details)
+
 
 @pytest.fixture
 def registry() -> ComponentProviderRegistry:
@@ -260,8 +262,8 @@ def test_raises_if_child_provider_aliases_parent_type_for_type_dependency():
     # This should fail because consumer needs Printer by type,
     # but both parent and child provide Printer type, making it ambiguous
     with pytest.raises(
-            DependencyError,
-            match=r"Multiple candidates for dependency on type",
+        DependencyError,
+        match=r"Multiple candidates for dependency on type",
     ):
         make_bundle(consumer_registry, parent=child_bundle)
 
@@ -296,7 +298,7 @@ def test_raises_if_child_provider_aliases_parent_type_for_satisfied_dependency()
     # 3. Parent bundle also provides Service type
     # This creates ambiguity for the type-based dependency resolution
     with pytest.raises(
-            DependencyError,
-            match=r"Provider types .* alias types also provided by parent bundle",
+        DependencyError,
+        match=r"Provider types .* alias types also provided by parent bundle",
     ):
         make_bundle(child_registry, parent=parent_bundle)

@@ -37,7 +37,9 @@ class ProviderSet:
 
 
 def make_provider_set(
-    providers: list[ComponentProvider], profiles: set[str], require_complete: bool = True
+    providers: list[ComponentProvider],
+    profiles: set[str],
+    require_complete: bool = True,
 ) -> ProviderSet:
     """
     Constructs a ProviderSet from a list of ComponentProviders and an active profile set.
@@ -72,13 +74,20 @@ def make_provider_set(
     }
 
     by_type_dependencies = _by_type_dependencies(providers)
-    resolved_type_dependencies = _resolved_type_dependencies(by_type_dependencies, providers, profiles)
+    resolved_type_dependencies = _resolved_type_dependencies(
+        by_type_dependencies, providers, profiles
+    )
 
     unsatisfied_by_name_dependencies = by_name_dependencies - providers_by_name.keys()
-    unsatisfied_by_type_dependencies = by_type_dependencies - resolved_type_dependencies.keys()
+    unsatisfied_by_type_dependencies = (
+        by_type_dependencies - resolved_type_dependencies.keys()
+    )
 
     if require_complete:
-        if len(unsatisfied_by_name_dependencies) > 0 or len(unsatisfied_by_type_dependencies) > 0:
+        if (
+            len(unsatisfied_by_name_dependencies) > 0
+            or len(unsatisfied_by_type_dependencies) > 0
+        ):
             unsatisfied = unsatisfied_by_name_dependencies.union(
                 type.__name__ for type in unsatisfied_by_type_dependencies
             )
@@ -92,21 +101,21 @@ def make_provider_set(
         providers_by_name,
         resolved_type_dependencies,
         frozenset(unsatisfied_by_name_dependencies),
-        frozenset(unsatisfied_by_type_dependencies)
+        frozenset(unsatisfied_by_type_dependencies),
     )
 
 
 def _resolved_type_dependencies(by_type_dependencies, providers, profiles):
     """Resolve type-based dependencies to unique provider names.
-    
+
     Args:
         by_type_dependencies: Mapping of types to dependencies that need them.
         providers: List of available providers.
         profiles: Active profiles (for error reporting).
-        
+
     Returns:
         Dictionary mapping types to the unique provider names that satisfy them.
-        
+
     Raises:
         DependencyError: If multiple providers can satisfy the same type dependency.
     """

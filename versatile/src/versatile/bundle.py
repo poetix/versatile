@@ -61,7 +61,6 @@ class Bundle:
         return candidates[0].component
 
 
-
 class BundleBuilder:
     """Instantiate components from a :class:`BundleManifest`."""
 
@@ -111,11 +110,11 @@ class BundleBuilder:
 
 def _validate_scoped_values(required_from_scope, scope_keys):
     """Validate that the provided scope contains exactly the required items.
-    
+
     Args:
         required_from_scope: Set of dependency names that must be provided.
         scope_keys: Set of keys actually provided in the scope dictionary.
-        
+
     Raises:
         DependencyError: If required items are missing or unexpected items are provided.
     """

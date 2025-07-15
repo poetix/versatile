@@ -15,13 +15,13 @@ Key Features:
 Basic Usage:
     >>> from versatile.registry import ComponentProviderRegistry
     >>> from versatile.builders import make_bundle
-    >>> 
+    >>>
     >>> registry = ComponentProviderRegistry()
-    >>> 
+    >>>
     >>> @registry.provides()
     >>> def make_database() -> Database:
     ...     return Database()
-    >>> 
+    >>>
     >>> bundle = make_bundle(registry)
     >>> db = bundle[Database]
 

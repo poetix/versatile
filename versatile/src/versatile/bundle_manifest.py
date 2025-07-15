@@ -22,6 +22,7 @@ from versatile.registry import ComponentProvider
 
 __all__ = ["ResolvedComponentProvider", "BundleManifest", "BundleManifestBuilder"]
 
+
 @dataclass(frozen=True)
 class ResolvedComponentProvider:
     provider: ComponentProvider
@@ -31,11 +32,16 @@ class ResolvedComponentProvider:
     def from_provider(
         provider: ComponentProvider, resolved_type_lookup: dict[type, str]
     ) -> "ResolvedComponentProvider":
-        return ResolvedComponentProvider(provider, {
-            dependency.parameter_name: (
-                    dependency.component_name or resolved_type_lookup[dependency.declared_type]
-            ) for dependency in provider.dependencies
-        })
+        return ResolvedComponentProvider(
+            provider,
+            {
+                dependency.parameter_name: (
+                    dependency.component_name
+                    or resolved_type_lookup[dependency.declared_type]
+                )
+                for dependency in provider.dependencies
+            },
+        )
 
 
 @dataclass(frozen=True)
@@ -127,20 +133,22 @@ class BundleManifestBuilder:
     def __init__(self, parent: Optional[ComponentSet]):
         self._parent = parent
 
-    def build(self, provider_set: ProviderSet, require_complete: bool = True) -> BundleManifest:
+    def build(
+        self, provider_set: ProviderSet, require_complete: bool = True
+    ) -> BundleManifest:
         """Build a BundleManifest from a validated ProviderSet.
-        
+
         Performs dependency resolution and topological sorting to determine
         the order in which providers should be invoked. Validates that all
         dependencies can be satisfied either by providers in the set, by
         the parent bundle, or by externally-supplied scope.
-        
+
         Args:
             provider_set: Validated set of providers to resolve.
-            
+
         Returns:
             A BundleManifest describing how to build the bundle.
-            
+
         Raises:
             DependencyError: If provider names conflict with parent components.
         """
@@ -149,7 +157,9 @@ class BundleManifestBuilder:
         required_from_scope = self._get_required_from_scope(provider_set)
 
         resolved_providers: dict[str, ResolvedComponentProvider] = {
-            provider_name: ResolvedComponentProvider.from_provider(provider, resolved_type_lookup)
+            provider_name: ResolvedComponentProvider.from_provider(
+                provider, resolved_type_lookup
+            )
             for provider_name, provider in provider_set.providers_by_name.items()
         }
 
@@ -175,10 +185,10 @@ class BundleManifestBuilder:
 
     def _get_required_from_scope(self, provider_set) -> FrozenSet[str]:
         """Determine which dependencies must be supplied externally.
-        
+
         Args:
             provider_set: The ProviderSet containing dependency requirements.
-            
+
         Returns:
             Frozen set of component names that must be provided by external scope.
         """
@@ -193,7 +203,9 @@ class BundleManifestBuilder:
         )
 
     def _build_dependency_graph(
-        self, resolved_providers: dict[str, ResolvedComponentProvider], provided_from_scope
+        self,
+        resolved_providers: dict[str, ResolvedComponentProvider],
+        provided_from_scope,
     ) -> _DependencyGraph:
         """
         Construct a dependency graph where each provider maps to the set of provider names it depends on.
@@ -224,10 +236,10 @@ class BundleManifestBuilder:
 
     def _validate_compatibility_with_parent(self, provider_set):
         """Ensure provider names don't conflict with parent bundle components.
-        
+
         Args:
             provider_set: The ProviderSet to validate against the parent.
-            
+
         Raises:
             DependencyError: If any provider names conflict with parent components.
         """
@@ -254,9 +266,11 @@ class BundleManifestBuilder:
             return provider_set.resolved_type_dependencies
 
         aliased_types = {
-            resolved_type: (provider_name, self._parent.components_of_type(resolved_type))
-            for resolved_type, provider_name
-            in provider_set.resolved_type_dependencies.items()
+            resolved_type: (
+                provider_name,
+                self._parent.components_of_type(resolved_type),
+            )
+            for resolved_type, provider_name in provider_set.resolved_type_dependencies.items()
             if self._parent.provides_type(resolved_type)
         }
 
@@ -275,7 +289,9 @@ class BundleManifestBuilder:
             if len(candidates) == 1:
                 resolved_type_dependencies[unresolved_type] = candidates[0].name
 
-        if len(resolved_type_dependencies) < len(provider_set.unsatisfied_by_type_dependencies):
+        if len(resolved_type_dependencies) < len(
+            provider_set.unsatisfied_by_type_dependencies
+        ):
             raise DependencyError(
                 f"Unsatisfied type dependencies: {provider_set.unsatisfied_by_type_dependencies - resolved_type_dependencies.keys()}"
             )

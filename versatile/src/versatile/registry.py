@@ -10,7 +10,9 @@ from typing import (
     Annotated,
     get_args,
     Optional,
-    Any, Literal, Union,
+    Any,
+    Literal,
+    Union,
 )
 
 from versatile.domain import Dependency
@@ -43,23 +45,23 @@ class ComponentProvider:
             contains the class itself plus all its base classes.
         dependencies: List of Dependency objects describing what this provider needs.
         metadata: Dictionary of arbitrary metadata attached to the provider.
-    
+
     Example:
         >>> @registry.provides(name="database", profiles=["prod"])
         >>> def make_database() -> Database:
         ...     return Database()
-        >>> 
+        >>>
         >>> # Creates ComponentProvider with:
         >>> # - name: "database"
         >>> # - func: make_database
         >>> # - profiles: ["prod"]
         >>> # - provided_types: [Database]
         >>> # - dependencies: []
-        
+
         >>> @registry.provides()
         >>> class UserService(Service):
         ...     pass
-        >>> 
+        >>>
         >>> # Creates ComponentProvider with:
         >>> # - provided_types: [UserService, Service, object]
     """
@@ -74,13 +76,13 @@ class ComponentProvider:
 
 def inferred_name(target: Any) -> str:
     """Derive component name from class or function name, removing 'make_' prefix if present.
-    
+
     Args:
         target: The function or class to derive a name from.
-        
+
     Returns:
         The class name, or the function name with any 'make_' prefix removed.
-        
+
     Example:
         >>> inferred_name(Database)       # Returns "Database"
         >>> inferred_name(make_database)  # Returns "database"
@@ -97,16 +99,16 @@ def inferred_name(target: Any) -> str:
 
 def name_from_supertype(target: Any) -> str:
     """Derive component name from the first base class.
-    
+
     Args:
         target: The class to extract base class name from.
-        
+
     Returns:
         String representation of the first base class.
-        
+
     Raises:
         ValueError: If target is not a class.
-        
+
     Example:
         >>> class DatabaseService(Service): ...
         >>> name_from_supertype(DatabaseService)  # Returns "<class 'Service'>"
@@ -114,6 +116,7 @@ def name_from_supertype(target: Any) -> str:
     if not inspect.isclass(target):
         raise ValueError(f"{target} is not a class")
     return str(target.__bases__[0])
+
 
 class ComponentProviderRegistry:
     """Registry for components, supporting registration and profile-based filtering."""
@@ -179,76 +182,80 @@ class ComponentProviderRegistry:
         return decorator
 
 
-def _make_class_provider(cls: Any, component_name: str, profiles: list[str]) -> ComponentProvider:
+def _make_class_provider(
+    cls: Any, component_name: str, profiles: list[str]
+) -> ComponentProvider:
     """Create a ComponentProvider from a class by wrapping it with @dataclass.
-    
+
     For classes, the provided_types list includes the class itself and all its base classes,
     allowing the class to satisfy dependencies for any of its parent types.
-    
+
     Args:
         cls: The class to convert to a provider.
         component_name: the name to give the provided component.
         profiles: List of profiles for which the provider is active.
-        
+
     Returns:
         ComponentProvider wrapping the dataclass-decorated class with full type hierarchy.
     """
-    
+
     # Get the class hierarchy: the class itself plus all its base classes
     provided_types = [cls] + list(cls.__bases__)
-    
+
     return ComponentProvider(
         component_name,
         cls,
         profiles,
         provided_types,
         _get_dependencies(cls),
-        getattr(cls, '__provider_metadata__', {}),
+        getattr(cls, "__provider_metadata__", {}),
     )
+
 
 def _make_function_provider(
     func: Callable, component_name: str, profiles: list[str]
 ) -> ComponentProvider:
     """Create a ComponentProvider from a function.
-    
+
     Args:
         func: The function to convert to a provider.
         component_name: the name to give the provided component.
         profiles: List of profiles for which the provider is active.
-        
+
     Returns:
         ComponentProvider with analyzed dependencies and metadata.
     """
     return_type = get_type_hints(func).get("return", None)
     provided_types = [return_type] if return_type is not None else []
-    
+
     return ComponentProvider(
         component_name,
         func,
         profiles,
         provided_types,
         _get_dependencies(func),
-        getattr(func, '__provider_metadata__', {}),
+        getattr(func, "__provider_metadata__", {}),
     )
+
 
 def _profiles_match(stated: list[str], selected: set[str]) -> bool:
     """Check if a provider's profile requirements match the selected profiles.
-    
+
     Profile matching supports inclusion and exclusion patterns:
     - Normal profiles ("dev", "prod") must be in the selected set
     - Exclusion profiles ("!test") must NOT be in the selected set
     - Empty stated profiles match all selected profiles
-    
+
     Args:
         stated: List of profile patterns from the provider.
         selected: Set of currently active profile names.
-        
+
     Returns:
         True if the provider should be active for the selected profiles.
-        
+
     Example:
         >>> _profiles_match(["dev"], {"dev"})          # True
-        >>> _profiles_match(["!test"], {"dev"})        # True  
+        >>> _profiles_match(["!test"], {"dev"})        # True
         >>> _profiles_match(["!test"], {"test"})       # False
         >>> _profiles_match(["prod"], {"dev"})         # False
     """
@@ -262,17 +269,17 @@ def _profiles_match(stated: list[str], selected: set[str]) -> bool:
 
 def _get_dependencies(func: Callable) -> list[Dependency]:
     """Extract dependency information from a function's type annotations.
-    
+
     Analyzes the function signature to create Dependency objects for each
     parameter. Supports both simple type annotations and Annotated types
     with qualifier metadata.
-    
+
     Args:
         func: The function to analyze for dependencies.
-        
+
     Returns:
         List of Dependency objects describing each parameter.
-        
+
     Example:
         >>> def service(untyped, db: Database, cache: Annotated[Cache, "redis"]) -> Service:
         ...     pass
@@ -299,17 +306,15 @@ def _make_dependency(annotation, name) -> Dependency:
         return Dependency(name, annotation, None)
 
 
-
-
 def _get_name_from_return_type(func: Callable) -> str:
     """Extract component name from a function's return type annotation.
-    
+
     Args:
         func: The function to analyze.
-        
+
     Returns:
         String representation of the return type.
-        
+
     Raises:
         DependencyError: If the function has no return type annotation.
     """

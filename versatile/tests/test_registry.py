@@ -128,23 +128,22 @@ def test_unannotated_parameter_maps_to_untyped_dependency_with_parameter_name(re
 
 
 def test_converts_class_to_dataclass_and_registers_by_name(registry):
-    @registry.provides('user_service')
+    @registry.provides("user_service")
     class UserService:
-        user_name: Annotated[str, 'user_name']
+        user_name: Annotated[str, "user_name"]
 
     provider = registry.registered_providers()[0]
-    assert provider.name == 'user_service'
-    assert provider.dependencies == [Dependency('user_name', str, 'user_name')]
+    assert provider.name == "user_service"
+    assert provider.dependencies == [Dependency("user_name", str, "user_name")]
 
-    built = provider.func('Bob')
-    assert built.user_name == 'Bob'
+    built = provider.func("Bob")
+    assert built.user_name == "Bob"
+
 
 def test_registers_class_by_type(registry):
     @registry.provides()
     class UserService:
-        user_name: Annotated[str, 'user_name']
+        user_name: Annotated[str, "user_name"]
 
     provider = registry.registered_providers()[0]
-    assert provider.name == 'UserService'
-
-
+    assert provider.name == "UserService"
