@@ -1,99 +1,288 @@
-# Versatile Dependency Injection
+# Versatile
 
-Versatile is a lightweight framework for dependency injection using explicit resolution and scoped component graphs.
+A Python dependency injection framework that emphasizes explicit dependency management, type safety, and hierarchical scoping.
 
-Inspired by the core ideas of Spring component management, Versatile avoids runtime proxying or other hidden magic. Dependencies are resolved once into immutable bundles that can be layered to model global, request or other application scopes.
+## What It Does
 
-This approach is powerful because bundles are constructed deterministically and can be composed to match your application's scopes. It is elegant and Pythonic: providers are just plain functions annotated with type hints and registered via decorators, so everything remains explicit and easy to reason about.
+Versatile solves the problem of managing complex object graphs in Python applications by providing:
 
----
+- **Explicit dependency resolution** using standard Python type hints
+- **Hierarchical component scoping** for modeling global, session, and request-level dependencies
+- **Profile-based component selection** for different environments (dev, prod, test)
+- **Static dependency resolution** that builds immutable component bundles
+- **Comprehensive validation** with clear error messages for misconfigurations
 
-## Key Concepts
+## Core Concepts
 
-- **Component Providers** – functions registered with `ComponentProviderRegistry`
-  using `@provides` or `@provides_type`.  Dependencies are declared via typing
-  annotations and optional `Annotated` qualifiers.
-- **Bundles** – materialised graphs of components created via `make_bundle`.
-- **Scopes** – bundles may have parents, allowing you to layer request or
-  session components on top of global ones.
-- **Explicit Resolution** – dependencies are resolved once during bundle
-  construction; there are no runtime proxies or hidden lookups.
+### Component Registration
 
----
-
-## Example
+Register components using decorators on functions or classes:
 
 ```python
-from typing import Callable, Annotated
+from versatile.registry import ComponentProviderRegistry
+
+registry = ComponentProviderRegistry()
+
+# Function providers
+@registry.provides()
+def make_database() -> Database:
+    return Database()
+
+# Class providers  
+@registry.provides()
+class UserService:
+    def __init__(self, db: Database):
+        self.db = db
+```
+
+### Dependency Resolution
+
+Components can depend on others by type or by name:
+
+```python
+# Type-based dependency
+@registry.provides()
+def make_service(db: Database) -> Service:
+    return Service(db)
+
+# Name-based dependency
+from typing import Annotated
+
+@registry.provides()
+def make_service(db: Annotated[Database, "primary_db"]) -> Service:
+    return Service(db)
+```
+
+### Bundle Creation
+
+Build immutable containers of resolved components:
+
+```python
+from versatile.builders import make_bundle
+
+bundle = make_bundle(registry)
+service = bundle[UserService]  # Access by type
+database = bundle["database"]  # Access by name
+```
+
+### Profile System
+
+Conditionally activate components based on environment:
+
+```python
+@registry.provides(profiles=["dev"])
+def make_dev_database() -> Database:
+    return InMemoryDatabase()
+
+@registry.provides(profiles=["prod"])
+def make_prod_database() -> Database:
+    return PostgreSQLDatabase()
+
+@registry.provides(profiles=["!test"])  # Active when NOT in test
+def make_secure_service() -> Service:
+    return SecureService()
+
+# Activate specific profiles
+dev_bundle = make_bundle(registry, profiles={"dev"})
+prod_bundle = make_bundle(registry, profiles={"prod"})
+```
+
+### Hierarchical Scoping
+
+Create parent-child bundle relationships for layered dependency injection:
+
+```python
+# Global application components
+global_bundle = make_bundle(global_registry)
+
+# Request-scoped components that can depend on global ones
+request_bundle = make_bundle(request_registry, parent=global_bundle)
+
+# Session-scoped components
+session_bundle = make_bundle(session_registry, parent=request_bundle)
+```
+
+## Key Features
+
+### Type Safety
+- Uses standard Python type hints for dependency resolution
+- Validates type compatibility at bundle creation time
+- Provides clear error messages for type mismatches
+
+### Immutable Bundles
+- Bundles are immutable once created
+- Components are instantiated once in dependency order
+- No runtime proxying or lazy loading
+
+### Comprehensive Validation
+- Detects circular dependencies
+- Validates that all dependencies can be satisfied
+- Checks for naming conflicts and type ambiguities
+- Provides detailed error messages with resolution suggestions
+
+### External Scope Injection
+```python
+# Inject dependencies from external scope
+bundle = make_bundle(registry, scope={
+    "user_id": current_user.id,
+    "request_id": request.id
+})
+```
+
+## Architecture
+
+### Three-Stage Resolution Process
+
+1. **ProviderSet**: Validates provider uniqueness and detects unresolvable type conflicts
+2. **BundleManifest**: Resolves dependencies and determines instantiation order
+3. **Bundle**: Materializes components in dependency order
+
+### Dependency Graph Resolution
+- Builds directed acyclic graph of component dependencies
+- Performs topological sort to determine build order
+- Detects and reports circular dependencies
+- Validates that all dependencies can be satisfied
+
+### Hierarchical Component Lookup
+- Child bundles can access parent components
+- Components are looked up by name with fallback to parent
+- Type-based resolution searches the entire hierarchy
+- Prevents parent-child naming conflicts
+
+## Example Usage
+
+### Basic Web Service
+
+```python
 from versatile.registry import ComponentProviderRegistry
 from versatile.builders import make_bundle
 
-# Define a registry and register providers
 registry = ComponentProviderRegistry()
-DB = Callable[[str], dict[str, str]]
-Service = Callable[[str], str]
-
-@registry.provides(name='db', profiles=['test'])
-def make_test_db() -> DB:
-    return lambda user_id: {"name": "Arthur", "role": "admin"}
-
-@registry.provides(name='db', profiles=['!test'])
-def make_real_db() -> DB:
-    return lambda user_id: {"name": "Martha", "role": "admin"}
 
 @registry.provides()
-def make_service(db: Annotated[DB, 'db']) -> Service:
-    return lambda user_id: f"Welcome, {db(user_id)['name']}!"
+def make_config() -> dict:
+    return {"database_url": "postgresql://localhost/app"}
 
-# Build a bundle for the active profile
-bundle = make_bundle(
-    registry,
-    {"test"},  # use {'prod'} for the real database
-)
+@registry.provides()
+def make_database(config: dict) -> Database:
+    return Database(config["database_url"])
 
-# Use the resolved service (lookup works by name or by type)
-service = bundle[Service]
-print(service("u001"))  # Welcome, Arthur
+@registry.provides()
+class UserService:
+    def __init__(self, db: Database):
+        self.db = db
+    
+    def get_user(self, user_id: str) -> User:
+        return self.db.query_user(user_id)
+
+@registry.provides()
+class UserController:
+    def __init__(self, user_service: UserService):
+        self.user_service = user_service
+    
+    def get_user_endpoint(self, user_id: str) -> dict:
+        user = self.user_service.get_user(user_id)
+        return {"user": user.to_dict()}
+
+# Create bundle and use components
+bundle = make_bundle(registry)
+controller = bundle[UserController]
 ```
 
-## Features
-
-* Declarative component registration with optional profile filtering
-* Named or typed dependencies using standard type hints and `Annotated`
-* Bundles can inherit from a parent bundle to model scopes
-* Detection of ambiguous, missing or cyclic dependencies
-* Minimal runtime dependencies
-
-## Scopes and Bundle Inheritance
-You can model scopes like this:
+### Multi-Environment Configuration
 
 ```python
-# Global bundle
-global_bundle = make_bundle(global_registry)
+# Base components
+@registry.provides()
+def make_logger() -> Logger:
+    return Logger("app")
 
-# Session/request bundle layered on top
-session_bundle = make_bundle(session_registry, parent=global_bundle)
+# Environment-specific components
+@registry.provides(profiles=["dev"])
+def make_dev_database() -> Database:
+    return SQLiteDatabase(":memory:")
+
+@registry.provides(profiles=["prod"])
+def make_prod_database() -> Database:
+    return PostgreSQLDatabase(os.getenv("DATABASE_URL"))
+
+@registry.provides(profiles=["test"])
+def make_test_database() -> Database:
+    return MockDatabase()
+
+# Create environment-specific bundles
+dev_bundle = make_bundle(registry, profiles={"dev"})
+prod_bundle = make_bundle(registry, profiles={"prod"})
+test_bundle = make_bundle(registry, profiles={"test"})
 ```
 
-Components defined in the session bundle can refer to global components, but not vice versa. No dynamic proxying or indirection is involved—resolution is static and predictable.
+### Request Scoping
 
-### Introspecting with manifests
+```python
+# Global components
+global_registry = ComponentProviderRegistry()
 
-If you only need to examine the dependency graph or defer component creation
-until later, call `make_manifest` instead of `make_bundle`.  The returned
-`BundleManifest` describes the build order and which components must be supplied
-from an external scope.
+@global_registry.provides()
+def make_database() -> Database:
+    return Database()
 
-## Philosophy
-This library enforces discipline over convenience:
+# Request-scoped components
+request_registry = ComponentProviderRegistry()
 
-* No hidden magic
-* No runtime injection or interception
-* Deterministic resolution at bundle-construction time
-* Explicit scoping and layering
+@request_registry.provides()
+def make_request_context(
+    request: Annotated[Request, "current_request"]
+) -> RequestContext:
+    return RequestContext(request.user_id, request.session_id)
 
-This makes it well-suited for backend services, job runners, and applications where clarity and testability matter.
+@request_registry.provides()
+def make_user_service(
+    db: Database, 
+    context: RequestContext
+) -> UserService:
+    return UserService(db, context)
 
-## Status
+# Create hierarchical bundles
+global_bundle = make_bundle(global_registry)
+request_bundle = make_bundle(
+    request_registry, 
+    parent=global_bundle,
+    scope={"current_request": request}
+)
+```
 
-This project is under active development. Contributions, suggestions, and criticisms are welcome.
+## Error Handling
+
+The framework provides comprehensive error detection:
+
+```python
+from versatile.errors import DependencyError
+
+try:
+    bundle = make_bundle(registry)
+except DependencyError as e:
+    # Handle configuration errors:
+    # - Missing dependencies
+    # - Circular dependencies  
+    # - Type conflicts
+    # - Naming conflicts
+    # - Parent-child conflicts
+    print(f"Configuration error: {e}")
+```
+
+## Installation
+
+```bash
+git clone https://github.com/poetix/versatile.git
+cd versatile
+pip install -e .
+```
+
+## Requirements
+
+- Python 3.9+
+- No external dependencies for core functionality
+
+## License
+
+MIT License
