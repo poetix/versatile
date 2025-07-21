@@ -9,9 +9,9 @@ def registry():
 
 def test_decorator_tags_provider(registry):
     @registry.provides()
-    @repository()
+    @repository("db")
     def my_repo():
         pass
 
     repo = registry.registered_providers()[0]
-    assert repo.metadata == { "is_repository": True }
+    assert repo.metadata == { "db_name": "db", "is_repository": True }
