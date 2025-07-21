@@ -14,13 +14,13 @@ def set_metadata(func: Callable, **kwargs) -> Callable:
 
 def repository(db_name: str) -> Callable:
     def decorator(target: type) -> Callable:
-        return set_metadata(func, is_repository=True, db_name = db_name)
+        return set_metadata(target, is_repository=True, db_name = db_name)
 
     return decorator
 
-def sql(sql: str) -> Callable:
+def sql(query: str) -> Callable:
     def decorator(target: Any) -> Any:
-        target.__sql__ = sql
+        target.__sql__ = query
         return target
 
     return decorator
