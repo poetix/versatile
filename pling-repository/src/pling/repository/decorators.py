@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Any
 
 __all__ = ['repository']
 
@@ -12,9 +12,16 @@ def set_metadata(func: Callable, **kwargs) -> Callable:
     return func
 
 
-def repository() -> Callable:
-    def decorator(func: Callable) -> Callable:
-        return set_metadata(func, is_repository=True)
+def repository(db_name: str) -> Callable:
+    def decorator(target: type) -> Callable:
+        return set_metadata(func, is_repository=True, db_name = db_name)
+
+    return decorator
+
+def sql(sql: str) -> Callable:
+    def decorator(target: Any) -> Any:
+        target.__sql__ = sql
+        return target
 
     return decorator
 
